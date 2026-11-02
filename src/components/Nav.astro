@@ -1,0 +1,37 @@
+---
+// The top-bar navigation: language, book and chapter menus, previous / next chapter, and the review page with its count.
+import { languages, storeFor, LANG_NAMES } from "../lib/config.js";
+import { chapters } from "../lib/service.js";
+const { lang, book = null, ch = null, page = "edit" } = Astro.props;
+const list = chapters(storeFor(lang));
+const books = [...new Set(list.map((c) => c.book))];
+const cur = book || list[0]?.book;
+const inBook = list.filter((c) => c.book === cur);
+const i = list.findIndex((c) => c.book === book && c.chapter === Number(ch));
+const prev = i > 0 ? list[i - 1] : null, next = i >= 0 && i < list.length - 1 ? list[i + 1] : null;
+const url = (c) => `/edit/${lang}/${c.book}/${c.chapter}`;
+const first = Object.fromEntries(books.map((b) => [b, url(list.find((c) => c.book === b))]));
+const open = storeFor(lang).listPRs().filter((p) => p.status === "open" || p.status === "conflict").length;
+---
+<nav class="nav" data-first={JSON.stringify(first)}>
+  <select aria-label="Language" data-go="lang">
+    {languages().map((l) => <option value={`/edit/${l}`} selected={l === lang}>{LANG_NAMES[l] || l}</option>)}
+  </select>
+  <select aria-label="Book" data-go="book">
+    {books.map((b) => <option value={b} selected={b === cur}>{b}</option>)}
+  </select>
+  <select aria-label="Chapter" data-go="url">
+    {page !== "edit" && <option value="" selected>chapter</option>}
+    {inBook.map((c) => <option value={url(c)} selected={page === "edit" && c.chapter === Number(ch)}>{c.chapter}</option>)}
+  </select>
+  {prev ? <a class="step" href={url(prev)} title={`${prev.book} ${prev.chapter}`}>‹</a> : <span class="step off">‹</span>}
+  {next ? <a class="step" href={url(next)} title={`${next.book} ${next.chapter}`}>›</a> : <span class="step off">›</span>}
+  <a class={`rev${page === "review" ? " here" : ""}`} href={`/review/${lang}`}>Review{open ? ` (${open})` : ""}</a>
+</nav>
+<script is:inline>
+  document.querySelectorAll(".nav select").forEach((s) => s.addEventListener("change", () => {
+    const go = s.dataset.go, v = s.value;
+    if (!v) return;
+    location.href = go === "book" ? JSON.parse(s.closest(".nav").dataset.first)[v] : v;
+  }));
+</script>

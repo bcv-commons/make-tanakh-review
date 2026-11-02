@@ -1,0 +1,130 @@
+# The chapter format (global-tanakh language repositories)
+
+One chapter = up to four files in the book's folder, named `<BOOK>/<BOOK>_<CCC>.<ext>` (`GEN/GEN_020.md`). The text file
+is the invariant; every other file refers to it by verse and token index, so a plain `git diff` of any file reads verse by
+verse. Written 2026-11-02 (make-tanakh-review PLAN.md sections 15 and 16).
+
+## 1. `<BOOK>_<CCC>.md`: the text
+
+```
+---
+book: GEN
+chapter: 20
+status:
+  maturity: "Udkast"
+  translation: "Maskinudkast fra grundteksten, sammenholdt med Berean Standard Bible"
+  exegesis: "Endnu ikke sket"
+  literary: "Endnu ikke sket"
+  date: "17.08.2026"
+status_labels: ["Modenhed", "Oversættelse", "Eksegetisk bearbejdning", "Litterært tjek", "Dato for denne version"]
+---
+# Første Mosebog, kapitel 20
+
+## Abraham og Abimelek
+20:1	Abraham brød op derfra til Negev-landet ...
+20:2	...
+```
+
+- **Front matter** (YAML between `---` lines): `book`, `chapter`, and the chapter's status fields under `status` with fixed
+  keys (`maturity`, `translation`, `exegesis`, `literary`, `date`) and their labels in the language under `status_labels`.
+  Values are JSON strings. Other keys may follow; the editor shows them as they are.
+- **`# title`**: the chapter title, one line. **`## heading`**: a section heading; it stands before the verse line it precedes.
+- **Verse lines**: `chapter:verse<TAB>text`, one verse per line, in ascending order, translatable text only: no verse
+  markers, no notes, no line-break marks. A verse without text has an empty text field. Verse numbers follow the Hebrew
+  (MACULA) numbering, as the clause keys do.
+- Nothing else: no blank-line meaning, no other Markdown. A verse line is the whole verse; wrapping is the viewer's.
+
+**Tokens** are the standard tokeniser's (bcv-commons compact-alignments tokenizer v2, the same as the bibles repository's
+`bcv_tokenize`): NFC, combining marks dropped (except Myanmar), maximal runs of letters and marks; digits, punctuation and
+spaces separate; scripts without spaces by rule. Tokens are numbered from 0 within the verse. A token index used as an
+*anchor* means "before token a" (so `a` = the verse's token count means "at the end"). A text edit that changes only
+punctuation or spacing moves no index.
+
+## 2. `<BOOK>_<CCC>.align`: the alignment (sidecar 1)
+
+The compact-alignments working file as the drafting agents deliver it (make-tanakh `scripts/full_align.py`), unchanged:
+
+```
+# full alignment, bcv-commons compact-alignments format (scripts/full_align.py)
+# text <sha256>
+1	0:0 1:1-2 2:4 ...	1:3 !2 +5	b
+```
+
+- Rows: `verse<TAB>main links<TAB>function links<TAB>profile`. A link is `ordinal:tokens` (ordinal of the Hebrew content or
+  function token in MACULA order; tokens as `5`, `5-7`, `5,9`); decisions `!ord` (no target word), `u`/`e` (untranslated /
+  rendered elsewhere), `+pos` (added target words).
+- **Profile letters per verse**: `a` script, `b` agent, `h` checked by a person in the editor, `j` judged by Jev (with the
+  user's own key), `s` seed projection (an edit moved the text and the links were re-projected, not checked). The editor
+  writes `h`/`j`/`s`; a verse whose text changed and was not re-aligned is shown as *check*.
+- **`# text <sha256>`** is the SHA-256 of the lines `chapter:verse:text` of the `.md`'s verse lines, joined by newline. It
+  verifies the alignment against the text with no other file: a mismatch means a stale alignment, and CI refuses it.
+  **Every sidecar** (`.units` and `.notes` too) carries this line in its header, so one check guards them all, and a
+  pull request that changes the text without its sidecars cannot be merged (section 6). A commit id cannot serve here: a
+  file cannot hold the id of the commit that contains it; the content hash is history-independent and does the same job.
+
+## 3. `<BOOK>_<CCC>.units`: the clause units (sidecar 2)
+
+```
+# units: aligned; layout bcv-commons/hebrew-clause-layout@<revision>; token ranges of the standard tokeniser
+# text <sha256>
+20:1	010200010011-010200010052:0-5 010200010061-010200010081:6-12 010200010091-010200010112:=
+20:2	010200020011-010200020031:0-3 010200020041-010200020091:4-9 010200020011-010200020031/2:10-14
+```
+
+- One line per verse: `chapter:verse<TAB>key:range key:range ...`, the keys in **Hebrew order** (the layout's segment
+  order). A key is the clause's **span** `first-last`: the MACULA word ids (CC BY 4.0, credited in LICENSE) of its first and
+  last word (the last over all segments of a discontinuous clause). The first word is the clause's identity (the layout's
+  clause key); the last word is the check: when the pinned layout is upgraded, a clause whose span no longer matches was
+  split, merged or moved, and the migration map in `.tanakh/migrations/<old>-<new>.json` (built by the drafting side's
+  `migrate_keys.py`: same / grown / split / merged / moved per old clause) rewrites the keys and nothing else in the file.
+  Hebrew ids have 12 digits (book, chapter, verse, word, part), Greek ids 11 (no part: MACULA Greek keeps crasis forms such
+  as kago as one token, so Greek needs no part digit).
+- `key:a-b` the unit's tokens (inclusive); `key:a-b,c` scattered (the first range is where the unit's line begins);
+  `key:=` a clause with no words of its own (shown with the line before it).
+- `key/2`, `key/3`: the layout's own second and third segment of a Hebrew clause that is discontinuous in the Hebrew.
+  `key.2`: a translator's split of one Hebrew clause into two target units (`#` in the editor); `%` joins two keys into one
+  unit, written as the first key owning the range and the second as `=`.
+- Header: `authored` (the draft was written in clause lines matching the layout), `aligned` (a first cut from the `.align`
+  file's votes), `edited` (people's cuts, from the editor). Cuts are made once; after that they belong to people.
+  A re-draft proposal re-cuts only verses whose text changed.
+- The repository's pinned layout: `.tanakh/layout.json` (the two layout datasets with their revisions, the MACULA spine release). Every key must exist in it.
+
+## 4. `<BOOK>_<CCC>.notes`: inline notes (sidecar 3)
+
+```
+# notes: verse, kind, anchor token, text
+# text <sha256>
+20:2	T	7	Ordret: >>sendte bud og tog<<.
+20:9	E	14	Jf. 1 Mos 12,18.
+```
+
+Kinds as the drafting pipeline uses them: `T` text-critical, `E` exegetical, `H` cross-reference, `N` note to the
+reviewers. The anchor is the token the note follows. A note is one line (no newline in the text).
+
+## 5. Poetry lines: keyed by the source, not a sidecar (`.tanakh/poetry/<BOOK>.json`, decided 2026-11-02)
+
+Poetry line breaks are a property of the source text's layout, so they are kept once, keyed by the Hebrew or Greek word
+before which a line begins, in the template's `.tanakh/poetry/<BOOK>.json` (shared by every language repo; built by the
+drafting side's `poetry_layout.py` from the BSB's USFM `q` lines through the BSB translation tables, both CC0, read through
+the Hebrew-to-BSB verse map; word ids MACULA, CC BY 4.0). A viewer places a break before the target token linked to that
+word through the chapter's `.align`, or at the unit boundary when the word begins a clause (`how` = `clause`); a text
+without alignment is shown as prose. Each entry is `[word id, level, how]`, `how` = `clause` or `word` (the line begins
+exactly where the word's rendering begins: 97.6% of the 24,329 lines), `in` or `next` (keyed to the nearest word, 2.0%),
+`jev` / `jev?` (keyed by a Jev question where the gold alignment has none, Daniel's Aramaic above all; p >= 0.8 / 0.5-0.8;
+0.4%). Six lines of the BSB remain unkeyed. No language repo carries a layout file.
+
+## 6. What CI checks on every pull request (validation only; nothing is rewritten)
+
+- The `.md` parses: front matter, verse lines ascending, no verse twice, no text outside the forms above.
+- Every sidecar's `# text` hash matches the `.md` (the one check that keeps text and sidecars in step; required status
+  check on `main` and `approved`, no direct pushes). `.align`: profile letters from the list; token positions inside the verse.
+- `.units`: every key in the pinned layout, Hebrew order, no key twice, ranges inside the verse, each token in at most
+  one unit.
+- `.notes`: anchors inside the verse (0 .. token count).
+- No secrets, no files outside the forms above (a PR that touches other files is merged on github.com only).
+
+## 7. Derived formats
+
+Plain verse text (`chapter:verse<TAB>text`, the `.md` without front matter and headings), USFM, and the drafting pipeline's
+own chapter file are **built** from these files by the `index` repository's workflow and published there; they are never
+kept beside the sources.

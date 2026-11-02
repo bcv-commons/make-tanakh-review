@@ -1,0 +1,60 @@
+# The chapter format, checked on every pull request and every push to main and approved (FORMAT.md section 6). Validation only:
+# the job has read access and writes no file to the repository. Make it a required status check of main and approved.
+name: validate
+
+on:
+  pull_request:
+    branches: [main, approved]
+  push:
+    branches: [main, approved]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: pyarrow (reads the layout)
+        run: python -m pip install --quiet pyarrow==20.0.0
+
+      - name: the pinned layout revision
+        id: pin
+        run: echo "rev=$(python -c 'import json; print(json.load(open(".tanakh/layout.json"))["hebrew-clause-layout"]["revision"])')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/tanakh-layout
+          key: hebrew-clause-layout-${{ steps.pin.outputs.rev }}
+
+      - name: clause keys of the pinned layout
+        run: python .github/check/layout_keys.py . "$RUNNER_TEMP/keys.json" --cache ~/.cache/tanakh-layout
+
+      - name: files this pull request changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: git diff --name-only "$BASE" HEAD > "$RUNNER_TEMP/changed.txt"
+
+      - name: check the chapters
+        run: |
+          if [ -f "$RUNNER_TEMP/changed.txt" ]; then changed="--changed $RUNNER_TEMP/changed.txt"; fi
+          node .github/check/validate.mjs . --keys "$RUNNER_TEMP/keys.json" $changed

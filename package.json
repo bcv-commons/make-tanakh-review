@@ -1,0 +1,26 @@
+{
+  "name": "make-tanakh-review",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clause-by-clause editing of drafted Tanakh chapters: anyone suggests, reviewers merge, the team approves. Edits land as commits on per-user branches through a GitHub App (here: a local git mock).",
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
+    "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
+    "preview": "astro preview",
+    "test": "node --test test/*.test.js",
+    "init-local": "sh tools/init_local.sh"
+  },
+  "dependencies": {
+    "@astrojs/netlify": "8.2.10",
+    "astro": "7.4.1"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "license": "MIT"
+}

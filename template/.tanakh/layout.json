@@ -1,0 +1,19 @@
+{
+ "hebrew-clause-layout": {
+  "dataset": "bcv-commons/hebrew-clause-layout",
+  "revision": "514a88320ab6556e0f7fd2e686c9637fcf39bd62",
+  "licence": "CC BY 4.0 for clauses, words, kinds and rules (MACULA); the UHB text and the discourse hierarchy (CC BY-SA 4.0) are not used here"
+ },
+ "greek-nt-clause-layout": {
+  "dataset": "bcv-commons/greek-nt-clause-layout",
+  "revision": "22143094001c176a868e55f6f10dc2da1866b2f8",
+  "licence": "CC BY 4.0 (MACULA Greek)"
+ },
+ "spine": {
+  "release": "lexeme-spine-macula-2026-10-12",
+  "sha256": "f1003a2b19036788bfc063427cb5da1e883181d39c5c87e7ccb79eb5f7bf956d",
+  "licence": "CC BY 4.0 (MACULA Hebrew and Greek, Clear Bible; built by bcv-query)"
+ },
+ "keys": "clause span first-last of MACULA word ids (FORMAT.md section 3)",
+ "pinned": "2026-11-02"
+}

@@ -1,0 +1,92 @@
+---
+// Review (PLAN.md section 7): open proposals with their changed verses, clause by clause; merge (reviewers), close; chapters whose
+// working text differs from the approved one (team approves). Anyone can read this page.
+import Base from "../../layouts/Base.astro";
+import Nav from "../../components/Nav.astro";
+import { storeFor, LANG_NAMES } from "../../lib/config.js";
+import { currentUser } from "../../lib/session.js";
+import { proposal, awaitingApproval, roles } from "../../lib/service.js";
+import { byVerse, atoms } from "../../lib/units.js";
+const { lang } = Astro.params;
+const store = storeFor(lang);
+if (!store) return new Response("No such language", { status: 404 });
+const user = currentUser(Astro.cookies);
+const me = roles(store, user?.login);
+const open = store.listPRs().filter((p) => p.status === "open" || p.status === "conflict").map((p) => ({ ...p, files: proposal(store, p) }));
+const done = store.listPRs().filter((p) => p.status === "merged" || p.status === "closed").slice(-10).reverse();
+const waiting = awaitingApproval(store);
+const label = (list) => { const a = atoms(list); return list.map((u, i) => ({ ...u, label: a[i] })); };
+const verseDiff = (before, after, verses) => {
+  const B = byVerse(label(before)), A = byVerse(label(after));
+  return verses.map((r) => ({ ref: r, before: B.get(r) || [], after: A.get(r) || [] }));
+};
+const name = LANG_NAMES[lang] || lang;
+---
+<Base title={`Review (${name})`}>
+  <Nav slot="nav" lang={lang} page="review" />
+  <h1>Review: {name}</h1>
+  {user && !me.reviewer && (
+    <form method="post" action="/api/request-reviewer" class="card">
+      <input type="hidden" name="lang" value={lang} />
+      Reviewers merge proposals into the working text (the team approves it later). <button>Become a reviewer</button>
+    </form>
+  )}
+  {user && <p class="muted">You are {me.team ? "on the language team (approve) and a reviewer" : me.reviewer ? "a reviewer (merge)" : "an editor (propose)"}.</p>}
+
+  <h2>Open proposals ({open.length})</h2>
+  {open.length === 0 && <p class="muted">None.</p>}
+  {open.map((p) => (
+    <section class="card">
+      <h3>#{p.number} by {p.author} {p.status === "conflict" && <span class="tag warn">waits for {p.author} to choose</span>}</h3>
+      {p.files.map((f) => {
+        const [book, rest] = f.file.split("/"); const ch = Number(rest.slice(4, 7));
+        return (
+          <div>
+            <h4><a href={`/edit/${lang}/${book}/${ch}`}>{book} {ch}</a>: {f.verses.length} verse{f.verses.length === 1 ? "" : "s"} changed</h4>
+            {verseDiff(f.base, f.proposed, f.verses).map((d) => (
+              <div class="diff">
+                <div class="vref">{d.ref}</div>
+                <div class="old">{d.before.map((u) => <p><span class="lab">{u.label}</span> {u.text}</p>)}</div>
+                <div class="new">{d.after.map((u) => <p><span class="lab">{u.label}</span> {u.text}</p>)}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+      <div class="actions">
+        {me.reviewer && p.status === "open" && (
+          <form method="post" action="/api/merge"><input type="hidden" name="lang" value={lang} /><input type="hidden" name="number" value={p.number} />
+            <button class="primary">Merge into the working text</button></form>
+        )}
+        {user && (me.reviewer || user.login === p.author) && (
+          <form method="post" action="/api/close"><input type="hidden" name="lang" value={lang} /><input type="hidden" name="number" value={p.number} />
+            <button>Close without merging</button></form>
+        )}
+      </div>
+    </section>
+  ))}
+
+  <h2>Awaiting the team's approval ({waiting.length})</h2>
+  {waiting.length === 0 && <p class="muted">Every chapter's working text is the approved text.</p>}
+  {waiting.map((c) => (
+    <section class="card">
+      <h3><a href={`/edit/${lang}/${c.book}/${c.chapter}`}>{c.book} {c.chapter}</a>: {c.verses.length} verse{c.verses.length === 1 ? "" : "s"} changed since approval</h3>
+      {verseDiff(c.approved, c.main, c.verses).map((d) => (
+        <div class="diff">
+          <div class="vref">{d.ref}</div>
+          <div class="old">{d.before.map((u) => <p><span class="lab">{u.label}</span> {u.text}</p>)}</div>
+          <div class="new">{d.after.map((u) => <p><span class="lab">{u.label}</span> {u.text}</p>)}</div>
+        </div>
+      ))}
+      {me.team && (
+        <form method="post" action="/api/approve" class="actions"><input type="hidden" name="lang" value={lang} /><input type="hidden" name="file" value={c.path} />
+          <button class="primary">Approve {c.book} {c.chapter}</button></form>
+      )}
+    </section>
+  ))}
+
+  {done.length > 0 && (<>
+    <h2>Recently settled</h2>
+    <ul>{done.map((p) => <li>#{p.number} by {p.author}: {p.status}{p.merged_by ? ` by ${p.merged_by}` : p.closed_by ? ` by ${p.closed_by}` : ""}</li>)}</ul>
+  </>)}
+</Base>

@@ -1,0 +1,7 @@
+# Netlify: Astro builds the site and its server routes (Netlify Functions, @astrojs/netlify).
+[build]
+  command = "corepack pnpm build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22.22.1"
