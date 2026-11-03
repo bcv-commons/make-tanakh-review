@@ -6,9 +6,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export class StaleError extends Error {
-  constructor(msg) { super(msg); this.name = "StaleError"; }
-}
+import { StaleError } from "./errors.js";
+export { StaleError };
 
 const BOT = { name: "make-tanakh-review[bot]", email: "make-tanakh-review@users.noreply.local" };
 

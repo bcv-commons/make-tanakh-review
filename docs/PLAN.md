@@ -246,6 +246,19 @@ branch rules on `main` and `approved`; a reviewer-request issue form if the self
   shows the lines under a verse while its text is the one loaded. Open for the grammar side: many `word` keys sit on a suffix
   part one word early (DEU 28:4 `050280040032`, 28:6 `050280060033`); 4,556 of 12,446 `word` keys are on a part other than 1.
 
+- **GitHubStore (2026-11-02, PLAN.md 15.6 step 2, against a mock):** `src/lib/store/github.js`, the methods of LocalGitStore over
+  the REST API. The store interface became async (the flows await it; LocalGitStore is unchanged and simply answers at once).
+  Reads through the Git Data API (ref, recursive tree, blobs; immutable objects cached across requests) rather than the Contents
+  API: one tree serves every file of a commit, and `changedFiles` compares two trees (exact for any two commits; compare's file
+  list is three-dot and capped at 300). Writes: tree + commit + ref moved without force, so GitHub's fast-forward rule is the
+  compare-and-swap. The user's token writes their branch (in their fork when they cannot push, made on the first save) and opens
+  their PR; the App's token writes main / approved / roles.json and labels, closes, comments. Tested with `test/github-mock.js`:
+  the service tests now run on both stores (8 each), plus 7 GitHub tests (tokens and authorship, forks, the fork head as merge
+  parent, a race, the cache, labels, the App's JWT). **To check on real GitHub** (the mock assumes them): creating a ref or a commit in
+  a fork naming a commit that only the parent has (shared fork-network objects; else sync the fork first); that GitHub marks a PR
+  merged at once when its head reaches main by our merge commit; fork creation timing (the store waits up to ten tries).
+  Not done: OAuth sign-in, `storeFor` choosing GitHubStore, the language list from the organisation, rate-limit answers.
+
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
 1. Decisions (user): name and place (proposed bcv-commons/make-tanakh-review; local checkout next to the other bcv-commons repos,

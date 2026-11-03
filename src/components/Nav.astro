@@ -3,7 +3,7 @@
 import { languages, storeFor, LANG_NAMES } from "../lib/config.js";
 import { chapters } from "../lib/service.js";
 const { lang, book = null, ch = null, page = "edit" } = Astro.props;
-const list = chapters(storeFor(lang));
+const list = await chapters(storeFor(lang));
 const books = [...new Set(list.map((c) => c.book))];
 const cur = book || list[0]?.book;
 const inBook = list.filter((c) => c.book === cur);
@@ -11,7 +11,7 @@ const i = list.findIndex((c) => c.book === book && c.chapter === Number(ch));
 const prev = i > 0 ? list[i - 1] : null, next = i >= 0 && i < list.length - 1 ? list[i + 1] : null;
 const url = (c) => `/edit/${lang}/${c.book}/${c.chapter}`;
 const first = Object.fromEntries(books.map((b) => [b, url(list.find((c) => c.book === b))]));
-const open = storeFor(lang).listPRs().filter((p) => p.status === "open" || p.status === "conflict").length;
+const open = (await storeFor(lang).listPRs()).filter((p) => p.status === "open" || p.status === "conflict").length;
 ---
 <nav class="nav" data-first={JSON.stringify(first)}>
   <select aria-label="Language" data-go="lang">

@@ -28,7 +28,7 @@ $A/.venv/bin/lexeme-aligner align-text --text $L/.local/links/text --edition dan
     --run2 $L/.local/links/out/runs/run2 --out $L/.local/links/sidecars)
 sh tools/add_links.sh dan                    # commit the sidecars to main as the bot
 corepack pnpm dev                            # http://127.0.0.1:4321
-corepack pnpm test                           # 20 tests: model, store, flows, the browser script and its links (jsdom)
+corepack pnpm test                           # model, both stores, the flows on both, the browser script (jsdom), CI check
 ```
 
 Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop the dev server: `corepack pnpm astro dev stop`.
@@ -62,6 +62,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `template/.github/` | the language repos' CI: `workflows/validate.yml` runs `check/validate.mjs` (FORMAT.md section 6) |
 | `src/lib/units.js` | the clause-unit model: `#` / `%`, labels, changed verses (browser and server) |
 | `src/lib/store/local-git.js` | the store: git plumbing, compare-and-swap refs, pull request records |
+| `src/lib/store/github.js` | the same store on GitHub's API (two tokens, forks, the App's token); `test/github-mock.js` is its mock GitHub |
 | `src/lib/service.js` | the flows: load, save, proposal, merge, bring in main, close, reviewer request, approve |
 | `src/lib/session.js`, `http.js`, `config.js` | mock sign-in (signed cookie), route helpers, settings (`MTR_DATA`) |
 | `src/pages/` | home, editor (`edit/[lang]/[book]/[ch]`), review (`review/[lang]`), `api/*` |
@@ -71,15 +72,23 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 
 ## From the local test to GitHub
 
-Write `GitHubStore` with the methods of `LocalGitStore`, using a GitHub App installation token:
+`src/lib/store/github.js` is `GitHubStore`: the methods of `LocalGitStore` (async; the flows in `service.js` await every store call),
+one instance per request for the signed-in user. It is tested against a mock GitHub (`test/github-mock.js`), not yet against
+GitHub itself, and the app does not use it yet (`config.js` still makes a `LocalGitStore`; sign-in is next).
 
-| LocalGitStore | GitHub |
+| LocalGitStore | GitHubStore |
 |---|---|
-| `readFile(branch, path)` -> `{text, version}` | `GET /repos/{o}/{r}/contents/{path}?ref=` (version = the file's blob sha) |
-| `writeFiles(branch, files, {expect})` | `PUT /contents/{path}` with `sha` (one file) or Git Data API: blobs, tree, commit, `PATCH /git/refs` |
-| `commitMerge(into, from, files)` | Git Data API: tree + commit with two parents, `PATCH /git/refs/heads/{into}` (`force: false`) |
-| `setBranch`, `branchHead`, `mergeBase`, `changedFiles` | `POST/PATCH /git/refs`, `GET /git/ref`, `GET /compare/{a}...{b}` |
-| `createPR`, `updatePR`, `listPRs` | `POST/PATCH/GET /pulls` (a merge by our merge commit closes the PR as merged) |
-| `roles()` | reviewers = repo collaborators with write; team = a GitHub team or CODEOWNERS |
+| `readFile`, `listFiles` | `GET /git/ref/heads/{b}`, then the commit's tree read whole (`GET /git/trees/{sha}?recursive=1`) and `GET /git/blobs/{sha}`; trees and blobs are cached across requests (version = the blob sha) |
+| `writeFiles(branch, files, {expect})` | `POST /git/trees` (on the head's tree), `POST /git/commits`, `PATCH /git/refs/heads/{b}` without force: a branch that moved is refused |
+| `commitMerge(into, from, files)` | the same with two parents; a fork's head is the second parent, so GitHub marks the PR merged by itself |
+| `setBranch`, `branchHead`, `mergeBase`, `changedFiles` | `POST/PATCH /git/refs`, `GET /git/ref`, `GET /compare/{a}...{b}` (merge base), the two trees compared |
+| `createPR`, `updatePR`, `listPRs` | `POST/GET /pulls` (open ones into main, the last ten closed), the `conflict` label, `PATCH` to close, a comment naming who merged or closed |
+| `roles()`, `setRoles()` | `roles.json` on main, written by the App |
+
+Tokens (PLAN.md 15.2 point 2): the user's own token writes their `edit/<login>` branch and opens their pull request (with the CC0
+line in its body); the App's installation token (`appTokens`: minted from the App's private key, kept until near expiry) writes
+`main`, `approved` and `roles.json`, and labels, closes and comments on pull requests. A user without push access to the language
+repo gets a fork on their first save, and their branch lives there. A save costs about 14 requests (3 of them writes), the first
+save with the fork about 25, a merge about 18 (4 writes).
 
 Sign-in becomes the App's user authorisation (identity only); the session cookie is unchanged. What to set up is in PLAN.md §12.

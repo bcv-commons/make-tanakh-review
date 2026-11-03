@@ -11,10 +11,12 @@ const { lang } = Astro.params;
 const store = storeFor(lang);
 if (!store) return new Response("No such language", { status: 404 });
 const user = currentUser(Astro.cookies);
-const me = roles(store, user?.login);
-const open = store.listPRs().filter((p) => p.status === "open" || p.status === "conflict").map((p) => ({ ...p, files: proposal(store, p) }));
-const done = store.listPRs().filter((p) => p.status === "merged" || p.status === "closed").slice(-10).reverse();
-const waiting = awaitingApproval(store);
+const me = await roles(store, user?.login);
+const prs = await store.listPRs();
+const open = [];
+for (const p of prs.filter((p) => p.status === "open" || p.status === "conflict")) open.push({ ...p, files: await proposal(store, p) });
+const done = prs.filter((p) => p.status === "merged" || p.status === "closed").slice(-10).reverse();
+const waiting = await awaitingApproval(store);
 const label = (list) => { const a = atoms(list); return list.map((u, i) => ({ ...u, label: a[i] })); };
 const verseDiff = (before, after, verses) => {
   const B = byVerse(label(before)), A = byVerse(label(after));

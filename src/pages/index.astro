@@ -5,9 +5,9 @@ import { chapters } from "../lib/service.js";
 const last = Astro.cookies.get("mtr_last")?.value || "";
 const [lang, book, ch] = last.split("/");
 const store = lang && storeFor(lang);
-if (store && chapters(store).some((c) => c.book === book && c.chapter === Number(ch))) return Astro.redirect(`/edit/${lang}/${book}/${ch}`);
+if (store && (await chapters(store)).some((c) => c.book === book && c.chapter === Number(ch))) return Astro.redirect(`/edit/${lang}/${book}/${ch}`);
 const l = languages()[0];
-const c = l && chapters(storeFor(l))[0];
+const c = l && (await chapters(storeFor(l)))[0];
 if (!c) return new Response("No language repos yet: run tools/prepare_chapter.py and tools/init_local.sh.", { status: 404 });
 return Astro.redirect(`/edit/${l}/${c.book}/${c.chapter}`);
 ---
