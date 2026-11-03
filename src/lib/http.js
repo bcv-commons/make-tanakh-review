@@ -27,12 +27,13 @@ export async function act(ctx, fn, { open = false } = {}) {
     const to = b.data.next && String(b.data.next).startsWith("/") ? String(b.data.next) : back(request);
     return ctx.redirect(msg ? `${to}?msg=${encodeURIComponent(msg)}` : to, 303);
   };
-  const user = currentUser(cookies);
+  const user = await currentUser(cookies);
   if (!open && !user) return reply(401, { error: "Sign in first." }, "Sign in first.");
-  const store = b.data.lang ? storeFor(String(b.data.lang)) : null;
+  const store = b.data.lang ? await storeFor(String(b.data.lang), user) : null;
   if (b.data.lang && !store) return reply(404, { error: "No such language." }, "No such language.");
   try {
-    const r = (await fn({ user, store, data: b.data, cookies })) || {};
+    const r = (await fn({ user, store, data: b.data, cookies, request })) || {};
+    if (r.redirect && !b.json) return ctx.redirect(r.redirect, 303);       // e.g. off to GitHub's sign-in
     return reply(200, r, r.message);
   } catch (e) {
     if (e instanceof Refused) return reply(e.status, { error: e.message }, e.message);

@@ -64,7 +64,8 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `src/lib/store/local-git.js` | the store: git plumbing, compare-and-swap refs, pull request records |
 | `src/lib/store/github.js` | the same store on GitHub's API (two tokens, forks, the App's token); `test/github-mock.js` is its mock GitHub |
 | `src/lib/service.js` | the flows: load, save, proposal, merge, bring in main, close, reviewer request, approve |
-| `src/lib/session.js`, `http.js`, `config.js` | mock sign-in (signed cookie), route helpers, settings (`MTR_DATA`) |
+| `src/lib/session.js`, `oauth.js` | the sealed session cookie, the CC0 agreement; GitHub sign-in (local: sign-in by name) |
+| `src/lib/http.js`, `config.js` | route helpers; settings (`MTR_DATA`, `MTR_GITHUB_*`), the language list, the store per user |
 | `src/pages/` | home, editor (`edit/[lang]/[book]/[ch]`), review (`review/[lang]`), `api/*` |
 | `src/client/editor.js` | the editor in the browser |
 
@@ -74,7 +75,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 
 `src/lib/store/github.js` is `GitHubStore`: the methods of `LocalGitStore` (async; the flows in `service.js` await every store call),
 one instance per request for the signed-in user. It is tested against a mock GitHub (`test/github-mock.js`), not yet against
-GitHub itself, and the app does not use it yet (`config.js` still makes a `LocalGitStore`; sign-in is next).
+GitHub itself. The app uses it when the five `MTR_GITHUB_*` settings are set (`.env.example`); without them it is the local test.
 
 | LocalGitStore | GitHubStore |
 |---|---|
@@ -91,4 +92,7 @@ line in its body); the App's installation token (`appTokens`: minted from the Ap
 repo gets a fork on their first save, and their branch lives there. A save costs about 14 requests (3 of them writes), the first
 save with the fork about 25, a merge about 18 (4 writes).
 
-Sign-in becomes the App's user authorisation (identity only); the session cookie is unchanged. What to set up is in PLAN.md §12.
+**Sign-in with GitHub** (`src/lib/oauth.js`, `src/pages/auth/callback.js`): the GitHub App's user authorisation, identity only.
+The session cookie is sealed (AES-256-GCM under `MTR_SESSION_SECRET`) and holds the login and the user's token (refreshed when it
+expires); the CC0 tick is remembered on the browser for that login and stated in the user's pull requests. The language list is
+the organisation's public repositories with the topic `global-tanakh`. What to set up is in PLAN.md section 12.

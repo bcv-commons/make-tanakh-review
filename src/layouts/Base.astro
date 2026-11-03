@@ -1,8 +1,10 @@
 ---
 // The page frame: title bar, sign-in state, a message line (?msg=) and the CC0 note.
 import { currentUser } from "../lib/session.js";
+import { githubSettings } from "../lib/config.js";
+const github = !!githubSettings();
 const { title } = Astro.props;
-const user = currentUser(Astro.cookies);
+const user = await currentUser(Astro.cookies);
 const msg = Astro.url.searchParams.get("msg");
 ---
 <!doctype html>
@@ -24,9 +26,10 @@ const msg = Astro.url.searchParams.get("msg");
           </form>
         ) : (
           <form method="post" action="/api/signin" class="signin">
-            <input name="login" placeholder="GitHub login" required size="14" autocomplete="username" />
+            <input type="hidden" name="next" value={Astro.url.pathname} />
+            {!github && <input name="login" placeholder="GitHub login" required size="14" autocomplete="username" />}
             <label title="Asked once, at the first sign-in"><input type="checkbox" name="agree" /> my edits are CC0</label>
-            <button>sign in</button>
+            <button>{github ? "sign in with GitHub" : "sign in"}</button>
           </form>
         )}
       </div>
@@ -35,7 +38,7 @@ const msg = Astro.url.searchParams.get("msg");
     <main><slot /></main>
     <footer>
       Drafts and edits: CC0 1.0. Hebrew text and glosses: MACULA Hebrew (WLC), CC BY 4.0. Clause units: bcv-commons
-      hebrew-clause-layout (from MACULA Hebrew), CC BY-SA 4.0. Local test: sign-in by name only, no GitHub.
+      hebrew-clause-layout (from MACULA Hebrew), CC BY 4.0.{!github && " Local test: sign-in by name only, no GitHub."}
     </footer>
   </body>
 </html>

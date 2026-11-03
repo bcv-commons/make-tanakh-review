@@ -7,13 +7,14 @@ import { blobSha } from "../src/lib/store/github.js";
 
 const sha1 = (s) => crypto.createHash("sha1").update(s).digest("hex");
 
-export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = null } = {}) {
+export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = null, client = { id: "Iv1.test", secret: "s3cret" } } = {}) {
   const objects = new Map();             // sha -> { type: "blob", text } | { type: "tree", files } | { type: "commit", tree, parents, message, author }
   const repos = new Map();               // "o/r" -> { refs: Map, fork, parent, push: Set }
   const tokens = new Map();              // token -> actor ("app" or a login)
   const pulls = [];                      // pull requests of the base repo
   const comments = [];
   const calls = [];
+  const codes = new Map(), refreshes = new Map();   // OAuth: code -> login, refresh token -> login
   let n = 0, clock = Date.parse("2026-11-02T10:00:00Z");
   const base = `${org}/${repo}`;
   repos.set(base, { refs: new Map(), fork: false, parent: null, push: new Set() });
@@ -69,7 +70,20 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
       const t = `ghs_${n++}`; tokens.set(t, "app");
       return [201, { token: t, expires_at: new Date(Date.now() + 3600e3).toISOString() }];
     }
+    // ---- sign-in (github.com/login/oauth/access_token answers 200 with an error field, as GitHub does)
+    if (method === "POST" && path === "/login/oauth/access_token") {
+      if (body.client_id !== client.id || body.client_secret !== client.secret) return [200, { error: "incorrect_client_credentials" }];
+      const login = body.grant_type === "refresh_token" ? refreshes.get(body.refresh_token) : codes.get(body.code);
+      if (!login) return [200, { error: body.grant_type ? "bad_refresh_token" : "bad_verification_code" }];
+      codes.delete(body.code); refreshes.delete(body.refresh_token);
+      const t = `ghu_${login}_${n++}`, r = `ghr_${login}_${n++}`;
+      tokens.set(t, login); refreshes.set(r, login);
+      return [200, { access_token: t, expires_in: 28800, refresh_token: r, refresh_token_expires_in: 15811200, token_type: "bearer" }];
+    }
     if (!actor) return [401, { message: "Bad credentials" }];
+    if (method === "GET" && path === "/user") return actor === "app" ? [403, { message: "not a user" }] : [200, { login: actor }];
+    if (method === "GET" && path === `/orgs/${org}/repos`)
+      return [200, [{ name: repo, topics: ["global-tanakh"], archived: false }, { name: "index", topics: [], archived: false }]];
     if (!(m = /^\/repos\/([^/]+\/[^/]+)(\/.*)?$/.exec(path))) return [404, { message: "Not Found" }];
     const name = m[1], rest = m[2] || "", r = repos.get(name);
     if (!r) return [404, { message: "Not Found" }];
@@ -202,6 +216,8 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
 
   return {
     fetch, calls, comments, base,
+    code(login) { const c = `code_${login}_${n++}`; codes.set(c, login); return c; },
+    expire(token) { tokens.delete(token); },
     user(login, { push = false } = {}) {                    // a GitHub user with a token; push: a collaborator of the base repo
       tokens.set(`gho_${login}`, login);
       if (push) repos.get(base).push.add(login);

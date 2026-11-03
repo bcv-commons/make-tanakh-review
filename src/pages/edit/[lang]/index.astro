@@ -1,7 +1,7 @@
 ---
 import { storeFor } from "../../../lib/config.js";
 import { chapters } from "../../../lib/service.js";
-const store = storeFor(Astro.params.lang);
+const store = await storeFor(Astro.params.lang);
 const c = store && (await chapters(store))[0];
 if (!c) return new Response("No such language", { status: 404 });
 return Astro.redirect(`/edit/${Astro.params.lang}/${c.book}/${c.chapter}`);

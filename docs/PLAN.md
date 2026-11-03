@@ -191,6 +191,15 @@ A GitHub organisation for the CC0 language repos; a GitHub App installed on it (
 user authorisation without scopes; App id, private key, client id / secret); a Netlify site with those as environment variables;
 branch rules on `main` and `approved`; a reviewer-request issue form if the self-serve grant should also work on github.com.
 
+In detail (2026-11-03, as the code expects it):
+- **The App:** permissions Contents read/write, Pull requests read/write, Metadata read; callback URL
+  `https://<site>/auth/callback`; "Expire user authorization tokens" on (the app refreshes them); installed on the organisation.
+- **The language repos:** public, topic `global-tanakh` (the language list), `roles.json` on main, branches `main` and `approved`.
+- **The Netlify site:** `MTR_GITHUB_APP_ID`, `MTR_GITHUB_PRIVATE_KEY`, `MTR_GITHUB_CLIENT_ID`, `MTR_GITHUB_CLIENT_SECRET`,
+  `MTR_GITHUB_ORG`, `MTR_SESSION_SECRET` (`.env.example`).
+- **Open (see the log, 2026-11-03):** where an outside contributor's branch lives, since an App's user token reaches only
+  repositories the App is installed on.
+
 ## Log (changes while building)
 
 - **Astro 7.4.1, not 7.4.4.** 7.4.2 and later need Node >= 22.23.4; this box has 22.22.1. 7.4.1 (Node >= 22.22) is pinned; the
@@ -258,6 +267,24 @@ branch rules on `main` and `approved`; a reviewer-request issue form if the self
   a fork naming a commit that only the parent has (shared fork-network objects; else sync the fork first); that GitHub marks a PR
   merged at once when its head reaches main by our merge commit; fork creation timing (the store waits up to ten tries).
   Not done: OAuth sign-in, `storeFor` choosing GitHubStore, the language list from the organisation, rate-limit answers.
+
+- **GitHub sign-in (2026-11-03, 15.6 step 2):** the App's user authorisation (`src/lib/oauth.js`, `/api/signin` -> github.com ->
+  `/auth/callback`), with a sealed ten-minute cookie carrying the state, the CC0 tick and the page to return to. The session
+  cookie is now sealed (AES-256-GCM), not just signed, in both modes: it holds the user's token and refresh token, so the server
+  keeps nothing (Netlify has no disk); an expired token is refreshed on the next request, a spent one signs the user out. The
+  CC0 agreement with GitHub: ticked at sign-in, remembered in a year-long sealed cookie for that login, and stated in each pull
+  request body (15.2 point 4). `config.js` picks GitHub when the five `MTR_GITHUB_*` settings are set (a partial set is an error);
+  `languages()` and `storeFor(lang, user)` became async (the organisation's repos with the topic, cached five minutes; a
+  GitHubStore per request with the user's token). 6 tests against the mock. The footer now credits the clause units as CC BY 4.0
+  (MACULA via hebrew-clause-layout), as decided 2026-11-02, instead of CC BY-SA.
+  **Found while writing it, open for the user:** a GitHub App's user token reaches only repositories the App is installed on.
+  The App is installed on the organisation, so a collaborator's branch in the language repo works; an outside contributor's fork
+  is in their own account, where the App is not, so their token cannot write it (and the fork call itself may need more than
+  the App's permissions). Choices: (a) the contributor also installs the App on their account (GitHub can combine install and
+  sign-in in one step; "all repositories" covers a fork made later), (b) the App writes outside contributors' `edit/<login>`
+  branches in the language repo with its own token, the person as co-author (as the local test does; costs the App's shared rate
+  limit), (c) an OAuth App with the `public_repo` scope instead (broad: it could write any public repo of the user). GitHubStore
+  as written does (a) and, for collaborators, the language repo; (b) is a small change in `writer()` / `home()`.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
