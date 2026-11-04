@@ -7,10 +7,13 @@
 //                                                         you in (two more clicks); the credentials are saved
 //   node tools/github_live_test.mjs run                    the flows, step by step, against the repo (it must have a first
 //                                                         commit on main; the test writes a test chapter and roles.json)
+//   node tools/github_live_test.mjs dev                    the app itself against that repo, on http://127.0.0.1:4398 (the App's
+//                                                         callback URL), with the App's settings from the saved credentials
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { spawn } from "node:child_process";
 import { GitHubStore, appTokens, newCache } from "../src/lib/store/github.js";
 import { refreshToken } from "../src/lib/oauth.js";
 import * as S from "../src/lib/service.js";
@@ -143,7 +146,19 @@ async function run() {
   process.exit(failed ? 1 : 0);
 }
 
+// the dev server with the App's settings; the session secret is kept with the credentials so sign-ins survive a restart
+function dev() {
+  const app = load("app.json");
+  let secret;
+  try { secret = load("session.json").secret; } catch { secret = crypto.randomBytes(32).toString("hex"); save("session.json", { secret }); }
+  const env = { ...process.env, MTR_GITHUB_APP_ID: String(app.id), MTR_GITHUB_PRIVATE_KEY: app.privateKey, MTR_GITHUB_CLIENT_ID: app.clientId,
+    MTR_GITHUB_CLIENT_SECRET: app.clientSecret, MTR_GITHUB_ORG: app.owner, MTR_SESSION_SECRET: secret, MTR_GITHUB_PRIVATE: "1",
+    ASTRO_TELEMETRY_DISABLED: "1" };
+  console.log(`the app against ${app.owner}/${app.repo}: open ${HOST}/ (language ${app.repo})`);
+  spawn("node_modules/.bin/astro", ["dev", "--port", String(PORT), "--host", "127.0.0.1"], { env, stdio: "inherit" }).on("exit", (c) => process.exit(c ?? 0));
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const [cmd, arg] = process.argv.slice(2);
-(cmd === "setup" ? setup(arg) : cmd === "run" ? run() : Promise.reject(new Error("usage: setup <owner>/<repo> | run"))).catch((e) => { console.error(e.message); process.exit(1); });
+(cmd === "setup" ? setup(arg) : cmd === "run" ? run() : cmd === "dev" ? Promise.resolve(dev()) : Promise.reject(new Error("usage: setup <owner>/<repo> | run | dev"))).catch((e) => { console.error(e.message); process.exit(1); });

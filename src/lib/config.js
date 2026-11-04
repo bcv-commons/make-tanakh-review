@@ -25,6 +25,7 @@ export function githubSettings(env = process.env) {
 let http = (...a) => globalThis.fetch(...a);
 let app = null, langs = null;
 export function useFetch(f) { http = f; app = null; langs = null; }
+export function forgetLanguages() { langs = null; }
 function appToken() {
   const s = githubSettings();
   if (!app || app.key !== s.appId + s.org) app = { key: s.appId + s.org, tokens: appTokens({ ...s, fetch: http }) };
@@ -40,8 +41,9 @@ export const BOOK_ORDER = ["GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT
   "EST", "JOB", "PSA", "PRO", "ECC", "SNG", "ISA", "JER", "LAM", "EZK", "DAN", "HOS", "JOL", "AMO", "OBA", "JON", "MIC", "NAM", "HAB",
   "ZEP", "HAG", "ZEC", "MAL"];
 
-// The language codes: locally the bare repos under MTR_DATA/repos; on GitHub the organisation's public repositories with the
-// topic `global-tanakh` (PLAN.md 15.2 point 5), read with the App's token.
+// The language codes: locally the bare repos under MTR_DATA/repos; on GitHub the repositories the App is installed on with the
+// topic `global-tanakh` (PLAN.md 15.2 point 5), public ones only: a reader who is not signed in reads them through the App.
+// MTR_GITHUB_PRIVATE=1 lists private ones too (a test against a private repo; never on a public site).
 export async function languages() {
   const s = githubSettings();
   if (!s) {
@@ -50,13 +52,13 @@ export async function languages() {
     } catch { return []; }
   }
   if (langs && langs.until > Date.now()) return langs.list;
-  const token = await appToken()(), list = [];
+  const token = await appToken()(), list = [], priv = process.env.MTR_GITHUB_PRIVATE === "1";
   for (let page = 1; ; page++) {
-    const res = await http(`https://api.github.com/orgs/${s.org}/repos?type=public&per_page=100&page=${page}`, {
+    const res = await http(`https://api.github.com/installation/repositories?per_page=100&page=${page}`, {
       headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "User-Agent": "make-tanakh-review" } });
-    if (!res.ok) throw new Error(`GitHub ${res.status}: the organisation's repositories`);
-    const repos = await res.json();
-    list.push(...repos.filter((r) => (r.topics || []).includes(TOPIC) && !r.archived).map((r) => r.name));
+    if (!res.ok) throw new Error(`GitHub ${res.status}: the App's repositories`);
+    const repos = (await res.json()).repositories;
+    list.push(...repos.filter((r) => (r.topics || []).includes(TOPIC) && !r.archived && (priv || !r.private)).map((r) => r.name));
     if (repos.length < 100) break;
   }
   langs = { list: list.sort(), until: Date.now() + 5 * 60 * 1000 };

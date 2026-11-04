@@ -93,7 +93,10 @@ test("an expired token is refreshed; one that cannot be is a sign-out", async ()
 });
 
 test("languages are the organisation's repos with the topic; a store per user with their token", async () => {
-  assert.deepEqual(await config.languages(), ["dan"]);
+  assert.deepEqual(await config.languages(), ["dan"]);                // the topic, public only
+  process.env.MTR_GITHUB_PRIVATE = "1"; config.forgetLanguages();
+  assert.deepEqual(await config.languages(), ["dan", "trial"]);
+  delete process.env.MTR_GITHUB_PRIVATE; config.forgetLanguages();
   assert.equal(await config.storeFor("eng"), null);
   const reader = await config.storeFor("dan");
   assert.ok(reader instanceof GitHubStore);

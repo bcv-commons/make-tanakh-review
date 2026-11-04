@@ -63,7 +63,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `src/lib/units.js` | the clause-unit model: `#` / `%`, labels, changed verses (browser and server) |
 | `src/lib/store/local-git.js` | the store: git plumbing, compare-and-swap refs, pull request records |
 | `src/lib/store/github.js` | the same store on GitHub's API (two tokens, forks, the App's token); `test/github-mock.js` is its mock GitHub |
-| `tools/github_live_test.mjs` | the live test: `setup <owner>/<repo>` makes a test App (manifest, three clicks), `run` runs the flows against a throw-away repo |
+| `tools/github_live_test.mjs` | the live test: `setup <owner>/<repo>` makes a test App (manifest, three clicks), `run` runs the flows against a throw-away repo, `dev` runs the app itself against it (port 4398) |
 | `src/lib/service.js` | the flows: load, save, proposal, merge, bring in main, close, reviewer request, approve |
 | `src/lib/session.js`, `oauth.js` | the sealed session cookie, the CC0 agreement; GitHub sign-in (local: sign-in by name) |
 | `src/lib/http.js`, `config.js` | route helpers; settings (`MTR_DATA`, `MTR_GITHUB_*`), the language list, the store per user |
@@ -96,4 +96,4 @@ comments on pull requests. A pull request made on github.com from a fork is read
 **Sign-in with GitHub** (`src/lib/oauth.js`, `src/pages/auth/callback.js`): the GitHub App's user authorisation, identity only.
 The session cookie is sealed (AES-256-GCM under `MTR_SESSION_SECRET`) and holds the login and the user's token (refreshed when it
 expires); the CC0 tick is remembered on the browser for that login and stated in the user's pull requests. The language list is
-the organisation's public repositories with the topic `global-tanakh`. What to set up is in PLAN.md section 12.
+the repositories the App is installed on with the topic `global-tanakh`, public ones only (`MTR_GITHUB_PRIVATE=1` lists private ones too, for a test). What to set up is in PLAN.md section 12.

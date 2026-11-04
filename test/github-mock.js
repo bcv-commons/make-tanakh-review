@@ -80,8 +80,10 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
     }
     if (!actor) return [401, { message: "Bad credentials" }];
     if (method === "GET" && path === "/user") return actor === "app" ? [403, { message: "not a user" }] : [200, { login: actor }];
-    if (method === "GET" && path === `/orgs/${org}/repos`)
-      return [200, [{ name: repo, topics: ["global-tanakh"], archived: false }, { name: "index", topics: [], archived: false }]];
+    if (method === "GET" && path === "/installation/repositories")
+      return actor === "app" ? [200, { total_count: 3, repositories: [{ name: repo, topics: ["global-tanakh"], archived: false, private: false },
+        { name: "index", topics: [], archived: false, private: false }, { name: "trial", topics: ["global-tanakh"], archived: false, private: true }] }]
+        : [403, { message: "an installation token only" }];
     if (!(m = /^\/repos\/([^/]+\/[^/]+)(\/.*)?$/.exec(path))) return [404, { message: "Not Found" }];
     const name = m[1], rest = m[2] || "", r = repos.get(name);
     if (!r) return [404, { message: "Not Found" }];
