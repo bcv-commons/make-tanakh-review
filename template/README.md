@@ -3,7 +3,7 @@
 Drafted Tanakh chapters, one verse per line (`<BOOK>/<BOOK>_<CCC>.md`, FORMAT.md), edited with
 [make-tanakh-review](https://github.com/bcv-commons/make-tanakh-review), clause by clause along the Hebrew. The Hebrew clauses
 are named by the word identifiers of MACULA Hebrew (Clear Bible / Biblica, CC BY 4.0), as laid out by bcv-commons'
-hebrew-clause-layout.
+hebrew-clause-layout (Hebrew Bible Clause Layout v0.37, bcv-commons, segmentation CC BY 4.0).
 
 - `main`: the working text; anyone's proposal (a pull request) is merged here by a reviewer, verse by verse.
 - `approved`: the text the language team has approved, chapter by chapter.

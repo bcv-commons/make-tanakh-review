@@ -42,6 +42,7 @@ kbd { border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-si
 .heb .clause { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .heb .w { display: inline-flex; flex-direction: column; align-items: center; }
 .heb .w .g { font: 11px/1.2 system-ui, sans-serif; color: var(--muted); }
+.heb .w .g.c { font-style: italic; opacity: .8; }
 .heb .w.unlinked .s { outline: 1px dotted var(--flag); outline-offset: 1px; color: var(--flag); }
 .unlinked { outline: 1px dotted var(--flag); color: var(--flag); padding: 0 2px; }
 .heb .cont { font-size: 13px; color: var(--muted); font-style: italic; }

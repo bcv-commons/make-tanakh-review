@@ -13,11 +13,13 @@ const file = store && /^[A-Z0-9]{3}$/.test(book) && /^\d{1,3}$/.test(ch) ? chapt
 const d = file ? await load(store, user?.login, file, { index: sourceIndex(book) }) : null;
 if (!d) return new Response("No such chapter", { status: 404 });
 Astro.cookies.set("mtr_last", `${lang}/${book}/${Number(ch)}`, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+const heb = hebrew(book, Number(ch)).verses;
 const data = {
   lang, file, book, chapter: Number(ch), user: user && { login: user.login, agreed: !!user.agreed, ...(await roles(store, user.login)) },
   branch: d.branch, pr: d.pr && { number: d.pr.number, status: d.pr.status }, units: d.units,
-  version: d.version, main: d.main, approved: d.approved, hebrew: hebrew(book, Number(ch)).verses,
+  version: d.version, main: d.main, approved: d.approved, hebrew: heb,
   verses: d.verses, title: d.title, headings: d.headings, notes: d.notes, poetry: d.poetry,
+  renderings: d.renderings, glosses: d.glosses, langName: LANG_NAMES[lang] || lang,
 };
 ---
 <Base title={`${book} ${ch} (${LANG_NAMES[lang] || lang})`}>

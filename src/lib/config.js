@@ -91,7 +91,8 @@ export function sourceIndex(book) {
   if (!indexes.has(book)) {
     try {
       const read = (kind) => JSON.parse(fs.readFileSync(path.join(DATA, "index", `${book}_${kind}.json`), "utf8"));
-      indexes.set(book, { keys: read("keys"), fn: read("fn_keys") });
+      const opt = (kind) => { try { return read(kind); } catch { return null; } };   // the lexeme lists (glosses): optional
+      indexes.set(book, { keys: read("keys"), fn: read("fn_keys"), lexemes: opt("lexemes"), fnLexemes: opt("fn") });
     } catch { indexes.set(book, null); }
   }
   return indexes.get(book);

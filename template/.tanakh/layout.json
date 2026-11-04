@@ -1,8 +1,9 @@
 {
  "hebrew-clause-layout": {
   "dataset": "bcv-commons/hebrew-clause-layout",
-  "revision": "514a88320ab6556e0f7fd2e686c9637fcf39bd62",
-  "licence": "CC BY 4.0 for clauses, words, kinds and rules (MACULA); the UHB text and the discourse hierarchy (CC BY-SA 4.0) are not used here"
+  "revision": "f7e58a2211973852d1fd7704dfb86ada34c82672",
+  "licence": "CC BY 4.0: the segmentation (clause_key, seg, first, last, words) and MACULA's clause fields, as the card states per part from this revision; the UHB text and the text-level hierarchy (CC BY-SA 4.0) are not used here",
+  "attribution": "Hebrew Bible Clause Layout (v0.37), bcv-commons, segmentation CC BY 4.0. Syntax: MACULA Hebrew, Clear Bible / Biblica (CC BY 4.0)"
  },
  "greek-nt-clause-layout": {
   "dataset": "bcv-commons/greek-nt-clause-layout",

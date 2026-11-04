@@ -2,6 +2,7 @@
 // over the API): load for a user, save (commit + pull request), update a branch from main,
 // merge a pull request, close, request reviewer access, approve a chapter. Routes call these; they hold no state of their own.
 // A chapter is four files (template/FORMAT.md): `file` names its .md; the .units, .notes and .align beside it travel with it.
+import { renderings, wordLexemes, chapterGlosses } from "./renderings.js";
 import { changedVerses } from "./units.js";
 import { readChapter, buildChapter, mergeChapter, verseInfo, display, EXTS, sibling, chapterOf } from "./chapter.js";
 import { StaleError } from "./store/errors.js";
@@ -62,7 +63,24 @@ export async function load(store, login, file, { index = null } = {}) {
   const cur = await model(store, branch, file);
   if (!cur) return null;
   return { branch, pr, units: cur.list, version: cur.versions, main: unitsOf(await model(store, MAIN, file)),
-    approved: unitsOf(await model(store, APPROVED, file)), verses: verseInfo(cur), ...display(cur), poetry: await poetry(store, branch, file, cur, index) };
+    approved: unitsOf(await model(store, APPROVED, file)), verses: verseInfo(cur), ...display(cur), poetry: await poetry(store, branch, file, cur, index),
+    renderings: cur.align && !cur.stale.align ? renderings(index, { book: file.slice(0, 3), verses: cur.verses, align: cur.align.rows }) : {},
+    glosses: chapterGlosses(await glossTable(store), wordLexemes(index, file.slice(0, 3), cur.verses.map((v) => v.ref))) };
+}
+
+// The language's commonest renderings per Hebrew lexeme: `.tanakh/glosses.json` on main (FORMAT.md section 8), published with the
+// chapters by the drafting side; null when the repo has none. Parsed once per version of the file.
+const glossTables = new Map();
+async function glossTable(store) {
+  const f = await store.readFile(MAIN, ".tanakh/glosses.json");
+  if (!f) return null;
+  if (!glossTables.has(f.version)) {
+    let t = null;
+    try { t = JSON.parse(f.text); } catch { /* a broken file: no glosses */ }
+    if (glossTables.size > 20) glossTables.clear();
+    glossTables.set(f.version, t);
+  }
+  return glossTables.get(f.version);
 }
 
 // The chapter's poetry lines by verse ({ "c:v": [{ at, level }] }; FORMAT.md section 5), from the repository's

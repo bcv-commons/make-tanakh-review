@@ -6,7 +6,7 @@ import { poemLines } from "../lib/poetry.js";
 const PROFILE = { a: ["aligned by script", ""], b: ["aligned by an agent", ""], h: ["links checked by a person", "ok"],
   j: ["links judged by Jev", "ok"], s: ["links re-projected after an edit: check", "check"] };
 
-let S;            // state: the page data + units, dirty, glosses
+let S;            // state: the page data + units, dirty, gloss mode
 const $ = (sel) => document.querySelector(sel);
 
 function el(tag, attrs = {}, ...kids) {
@@ -24,7 +24,8 @@ const canEdit = () => S.user && S.user.agreed;
 const sig = (u) => JSON.stringify([u.bases, u.text.trim()]);
 
 export function start(data) {
-  S = { ...data, dirty: false, glosses: localGet("mtr-glosses", "1") === "1", msg: "", err: false };
+  const g = localGet("mtr-glosses", "da");
+  S = { ...data, glossTable: data.glosses, dirty: false, glosses: g === "en" || g === "0" ? g : "da", msg: "", err: false };
   S.mainSigs = new Map([...byVerse(S.main)].map(([r, l]) => [r, new Set(l.map(sig))]));
   S.mainVerse = new Map([...byVerse(S.main)].map(([r, l]) => [r, JSON.stringify(l.map(sig))]));
   S.savedText = verseTexts(S.units);
@@ -56,14 +57,28 @@ function renderBar() {
     bar.append(el("button", { class: "primary", onclick: save, disabled: !S.dirty }, S.dirty ? "Save (Ctrl+S)" : "Saved"));
     if (S.pr) bar.append(el("button", { onclick: bringInMain, title: "Merge the working text's newer changes into your proposal" }, "Bring in the working text"));
   }
-  bar.append(el("label", { class: "toggle" }, el("input", { type: "checkbox", checked: S.glosses, onchange: (e) => {
-    S.glosses = e.target.checked; localSet("mtr-glosses", S.glosses ? "1" : "0"); render();
-  } }), " glosses"));
+  const opt = (v, label) => el("option", { value: v, selected: S.glosses === v }, label);
+  bar.append(el("label", { class: "toggle", title: "What stands under each Hebrew word" }, "glosses ",
+    el("select", { onchange: (e) => { S.glosses = e.target.value; localSet("mtr-glosses", S.glosses); render(); } },
+      opt("da", S.langName || "the translation"), opt("en", "English (MACULA)"), opt("0", "none"))));
   if (S.msg) bar.append(el("span", { class: S.err ? "err" : "note" }, S.msg));
+}
+
+// Under a Hebrew word: in the translation, the draft's own rendering (its .align links, as the page loaded it) or, where it has
+// none or the verse was changed since, the word's commonest renderings (tools/build_glosses.py) in italics; or MACULA's English.
+function wordGloss(w, live) {
+  const r = live && (S.renderings || {})[w.id], usual = (S.glossTable || {})[w.id];
+  const tip = [r && `this draft: ${r}`, usual && `usually: ${usual.map(([f, c]) => `${f} ${c}`).join(" · ")}`].filter(Boolean).join("\n");
+  if (S.glosses === "en") return { text: w.gloss, tip: w.gloss, cls: "g" };
+  if (S.glosses === "0") return { text: null, tip: tip || null, cls: "g" };
+  return r ? { text: r, tip, cls: "g" } : { text: usual ? usual[0][0] : null, tip: tip || null, cls: "g c" };
 }
 
 function hebrewCell(verse, u, seen) {
   const clauses = S.hebrew[verse] || [];
+  // the loaded alignment still fits the verse: its links say which content words are rendered
+  const live = verseTexts(S.units.filter((x) => x.ref === u.ref))[u.ref] === S.loadedText[u.ref];
+  const info = (S.verses || {})[u.ref] || {}, known = live && !info.stale && !!info.profile && Object.keys(S.renderings || {}).length > 0;
   const cell = el("div", { class: "heb", dir: "rtl", lang: "he" });
   for (const b of u.bases) {
     const key = clauseKey(b), c = clauses.find((x) => x.key === key);
@@ -71,8 +86,11 @@ function hebrewCell(verse, u, seen) {
     if (seen.has(key)) { cell.append(el("div", { class: "cont", dir: "ltr" }, "… the same Hebrew clause, continued")); continue; }
     seen.add(key);
     cell.append(el("div", { class: "clause", title: `${c.kind} ${c.rule}` },
-      c.words.map((w) => el("span", { class: `w${w.content && !w.linked ? " unlinked" : ""}`, title: w.gloss, "data-w": w.id },
-        el("span", { class: "s" }, w.surface), S.glosses ? el("span", { class: "g", dir: "ltr" }, w.gloss) : null))));
+      c.words.map((w) => {
+        const g = wordGloss(w, live), unlinked = w.content && (known ? !(S.renderings || {})[w.id] : !w.linked);
+        return el("span", { class: `w${unlinked ? " unlinked" : ""}`, title: g.tip, "data-w": w.id },
+          el("span", { class: "s" }, w.surface), g.text ? el("span", { class: g.cls, dir: "ltr" }, g.text) : null);
+      })));
   }
   return cell;
 }

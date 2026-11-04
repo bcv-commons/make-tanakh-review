@@ -128,3 +128,27 @@ exactly where the word's rendering begins: 97.6% of the 24,329 lines), `in` or `
 Plain verse text (`chapter:verse<TAB>text`, the `.md` without front matter and headings), USFM, and the drafting pipeline's
 own chapter file are **built** from these files by the `index` repository's workflow and published there; they are never
 kept beside the sources.
+
+## 8. Glosses: the language's commonest renderings per Hebrew lexeme (`.tanakh/glosses.json`, decided 2026-11-04)
+
+Counted by the drafting side (make-tanakh-grammar) from the drafted chapters' `.align` links and published with them, in the
+same pull request; the editor shows them under the Hebrew words (in italics where the draft has no link of its own) and in
+the word's hover text. Counts only: no verse text, nothing per word position. CC0 like the rest of the repo; the lexemes are
+MACULA's (CC BY 4.0) through the spine.
+
+```json
+{
+  "format": "make-tanakh-glosses/1",
+  "language": "dan",
+  "source": { "repo": "larsgson/make-tanakh-work", "commit": "a6d582a", "editions": ["dan_BSB"], "chapters": 431 },
+  "licence": "CC0-1.0 (counts from our drafts); lexemes: MACULA Hebrew (WLC) via lexeme-spine-macula, CC BY 4.0",
+  "lexemes": { "hbo:0430": [["gud", 846], ["guds", 417], ["guder", 83]], "hbo:0871a": [["i", 2800], ["på", 892]] }
+}
+```
+
+- Keys: the spine's lexemes with their prefix (`hbo:`, `grc:`), content and function words (the `.align` main and fn links).
+- Forms: lower-cased, as the drafts write them; a rendering of several words is one form; the commonest first; at most 8 per
+  lexeme; forms seen once are kept (the editor trims).
+- Counted: the language's drafted chapters (never `_eval/` or anything that has not passed the publishing screen).
+- The editor finds a word's lexeme in compact-alignments' source index (`_index/<BOOK>_lexemes.json` beside `_keys.json`,
+  `_fn.json` beside `_fn_keys.json`). A repo without the file shows the draft's own renderings and MACULA's English only.

@@ -295,6 +295,40 @@ In detail (2026-11-03, as the code expects it):
   the person as co-author. Found: GitHub refuses a tree with no entries ("Invalid tree info"), which a merge with no file
   changes sent; such a commit now reuses the head's tree, and the mock refuses an empty tree as GitHub does. One run met a
   passing 502 on opening a pull request (the pull request was made all the same); a rerun passed.
+- **2026-11-04: the clause-key licence is settled.** bcv-commons published the hebrew-clause-layout card per part (revision
+  f7e58a2, card only; data and segmentation `8977039d6ddb5383` unchanged): the segmentation (`clause_key`, `seg`, `first`,
+  `last`, `words`) is CC BY 4.0 like MACULA; CC BY-SA 4.0 covers only the UHB text and the text-level hierarchy; "a work that
+  uses only CC BY 4.0 fields is not bound by share-alike". `template/.tanakh/layout.json` pins f7e58a2 with the card's
+  attribution line. The language repos may be public (13.3, 15.4).
+- **Danish glosses in place of the English (asked 2026-11-04).** Options: hide them; the draft's own rendering of each Hebrew
+  word from the chapter's `.align` (live, no new data); a concordance gloss per Hebrew lexeme (the commonest Danish renderings
+  with counts); MACULA's English machine-translated. make-tanakh's answer: lexeme-aligner publishes `bcv-commons/lexeme-alignments`
+  `iso=dan` (Hugging Face; surface, lexeme, method, count; ~8,800 Hebrew lexemes; filter `method == eflomal`, the methods
+  near-duplicate), from dan1931 (Tanakh (c) Det Danske Bibelselskab); our 449 aligned dan_BSB chapters give ~6,950 lexemes;
+  the spine (`spine_words`: key = word id + morpheme digit, lexeme, is_content) gives the lexeme per word.
+  **Decided (user, 2026-11-04): an analysis of a text is not the text.** Which Danish words render a Hebrew lexeme, and how
+  often, is a fact about Danish, so statistics drawn from a protected translation may be used. The line kept: aggregates
+  (per-lexeme counts) only; anything per word position of a protected text (word id -> its rendering) would reproduce that
+  text and is not made from it. Per-word renderings come from our CC0 drafts only.
+  **Refined (user, 2026-11-04):** lexeme-aligner's *compact* alignments are usable even from a protected edition (they leave so
+  many gaps that the text cannot be rebuilt from them); only a *full* alignment of a copyrighted edition is out, and
+  lexeme-aligner publishes none. Full alignments of openly licensed texts (the Hebrew and Greek side among them) are on Hugging
+  Face from lexeme-aligner and may be used wherever they help.
+  Built (uncommitted at the time): `src/lib/renderings.js` (the draft's own rendering per Hebrew word, from the open chapter's
+  `.align`, nothing stored), the editor's gloss menu (the translation / English / none; the commonest renderings in italics
+  where the draft has no link or the verse changed), `tools/build_glosses.py` (a local table: drafts first, iso=dan eflomal rows
+  as fallback, ~7,700 lexemes). **Questioned (user):** a table per language kept by the app does not scale to many languages;
+  the counts belong outside the app, fetched and cached per language and cut to the open chapter's lexemes: lexeme-aligner's
+  per-language counts (Hugging Face; other editions) and our drafts' counts published on our own side (make-tanakh-work's
+  GitHub repository; our drafts never go to lexeme-aligner, 16.7). The lexeme per word comes from compact-alignments'
+  `_index/<BOOK>_lexemes.json` with `_keys.json` (`_fn.json` with `_fn_keys.json`), already published.
+- **Decided (user, 2026-11-04): the glosses' counts are made by make-tanakh-grammar** from our drafts' `.align` links and
+  published into each language repo as `.tanakh/glosses.json` with the chapters (FORMAT.md section 8); nothing goes to
+  lexeme-aligner. Built: the editor reads the file from the repo's main (`service.load`, parsed once per version), finds each
+  word's lexeme in compact-alignments' `_index/<BOOK>_lexemes.json` / `_fn.json` (fetched by `tools/fetch_index.mjs` with
+  the keys), trims noise (forms seen once or under 5%) and shows up to four; `tools/build_glosses.py` and the app-side tables
+  are gone. The glosses menu: the translation (default; the draft's own word, else the commonest in italics), English (MACULA),
+  none. The local test repo `dan-v2.git` carries a copy made from make-tanakh's trial counts (431 chapters).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
@@ -448,7 +482,7 @@ Little, because the local store is already one bare repo per language (section 4
   editor's server environment (Netlify); the index repo's workflow reads with a fine-grained read-only token.
 - The licence check of section 13.3 is settled **before the first public push**: the clause keys encode hebrew-clause-layout's
   clause boundaries (CC BY-SA 4.0). Either a credited CC BY-SA sidecar column, or bcv-query's agreement to CC BY for the
-  boundaries, or clauses cut from MACULA Hebrew (CC BY 4.0) directly. Until then, no language repo is public.
+  boundaries, or clauses cut from MACULA Hebrew (CC BY 4.0) directly. Until then, no language repo is public. **Settled 2026-11-04** (the log): the card states the segmentation CC BY 4.0.
   **Checked 2026-11-02 (make-tanakh-grammar session):** the layout's own card lists its sources part by part: the clauses,
   words, clause kinds and rules are MACULA Hebrew (CC BY 4.0); CC BY-SA comes from the UHB text and from the text-level
   hierarchy (discourse columns), which bcv-commons compiled. The repo's key column holds `clause_key` only, which is the MACULA
@@ -520,8 +554,8 @@ extent, and the module is offered to lexeme-aligner as a contribution once it wo
 In the editor, hovering a Hebrew word shows its draft words (section 14). Clicking a Hebrew word and then a draft word (or
 dragging across several) sets the link by hand; clicking the link mark removes it. A hand-set link has status `human` and
 is never overwritten by projection or proposal (only by another person). `human` links are the most valuable data in the
-repo: they are the review's own alignment, they go into the sidecar with the author's login, and they are what lexeme-aligner
-can learn from (16.7). A save writes text, units and links in one commit.
+repo: they are the review's own alignment, they go into the sidecar with the author's login, and they are what our own side
+(make-tanakh-work) learns from (16.7). A save writes text, units and links in one commit.
 
 ### 16.4 Jev on top, with the user's own key
 
@@ -563,8 +597,9 @@ a file.
 
 ### 16.7 What flows back
 
-- To lexeme-aligner: `human` and `jev` links as evidence for its priors (an export per language from the sidecars, CC0;
-  offered on the user's go).
+- ~~To lexeme-aligner: `human` and `jev` links as evidence for its priors.~~ **Dropped (user, 2026-11-04): our drafts and
+  links never go to lexeme-aligner.** They are used on our side (make-tanakh-work, for instance); data drawn from them is
+  published there, in its GitHub repository, and the app reads it from there.
 - To the drafting side: the re-draft proposal (`publish_global.py --propose`) re-cuts only verses whose text changed, from the
   new draft's `.align`, and leaves every other verse's units and links as the people left them.
 
@@ -578,4 +613,4 @@ a file.
    letters as the statuses; CI validation of FORMAT.md section 6; `.tanakh/layout.json` in the template.
 3. The hand-set link in the editor (click, drag, remove) and the save that carries links.
 4. Jev: the settings page for the key, the per-verse questions, the estimate, the `jev` status.
-5. The export of `human`/`jev` links for lexeme-aligner (user's go to send).
+5. ~~The export of `human`/`jev` links for lexeme-aligner.~~ Dropped (16.7).

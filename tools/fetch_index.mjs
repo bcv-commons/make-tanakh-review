@@ -1,5 +1,5 @@
-// Fetch compact-alignments' source index (the per-verse lists of MACULA keys that the .align ordinals count) for the poetry
-// view (src/lib/poetry.js) into $MTR_DATA/index (default .local/index), each file checked against the published _source.json.
+// Fetch compact-alignments' source index (the per-verse lists of MACULA keys that the .align ordinals count, and the lexemes
+// of the same lists) for the poetry view (src/lib/poetry.js) and the glosses (src/lib/renderings.js) into $MTR_DATA/index (default .local/index), each file checked against the published _source.json.
 // Read-only side data, CC BY 4.0 (MACULA); never committed.
 //   node tools/fetch_index.mjs GEN JOS ...        (no books: every Hebrew book)
 import crypto from "node:crypto";
@@ -30,8 +30,9 @@ fs.writeFileSync(path.join(DIR, "_source.json"), JSON.stringify(source));
 for (const b of books) {
   const want = source.books?.[b];
   if (!want) { console.log(`${b}: not in the index`); continue; }
-  for (const kind of ["keys", "fn_keys"]) {
-    const file = path.join(DIR, `${b}_${kind}.json`), sha = want[`${kind}_sha256`];
+  // the lexeme lists' checksums: `sha256` (content, _lexemes.json) and `fn_sha256` (function words, _fn.json)
+  for (const [kind, shaKey] of [["keys", "keys_sha256"], ["fn_keys", "fn_keys_sha256"], ["lexemes", "sha256"], ["fn", "fn_sha256"]]) {
+    const file = path.join(DIR, `${b}_${kind}.json`), sha = want[shaKey];
     const has = fs.existsSync(file) && crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex") === sha;
     if (has) continue;
     const data = await get(`${BASE}/${b}_${kind}.json`);
