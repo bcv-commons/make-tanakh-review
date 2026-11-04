@@ -9,55 +9,57 @@ import { mockGitHub } from "./github-mock.js";
 
 async function fresh() {
   const gh = mockGitHub(), app = gh.appToken(), cache = newCache();
-  const st = (login = null, push = false) => new GitHubStore({ owner: "global-tanakh", repo: "dan", app, fetch: gh.fetch, cache, wait: 0,
+  const st = (login = null, push = false) => new GitHubStore({ owner: "global-tanakh", repo: "dan", app, fetch: gh.fetch, cache,
     user: login ? gh.user(login, { push }) : null });
   await st().writeFiles("main", { "A/a.md": "one\n", "README.md": "readme\n" }, { message: "seed" });
   return { gh, st };
 }
 
-test("the App writes main as the bot with the person as co-author; a user writes their own branch as themselves", async () => {
+test("the App writes main as the bot with the person as co-author; a collaborator writes their own branch as themselves", async () => {
   const { gh, st } = await fresh();
   await st().writeFiles("main", { "A/a.md": "two\n" }, { message: "Approve A", coAuthor: "lead" });
   const head = gh.refs().get("main");
   assert.equal(gh.author(head), "make-tanakh-review[bot]");
   assert.match(gh.message(head), /^Approve A\n\nCo-authored-by: lead </);
-  const ann = st("ann");
-  await ann.setBranch("edit/ann", head);
-  const r = await ann.writeFiles("edit/ann", { "A/a.md": "three\n" }, { message: "Edit A", coAuthor: "ann" });
-  assert.equal(gh.author(r.commit), "ann");
+  const lead = st("lead", true);
+  await lead.setBranch("edit/lead", head);
+  const r = await lead.writeFiles("edit/lead", { "A/a.md": "three\n" }, { message: "Edit A", coAuthor: "lead" });
+  assert.equal(gh.author(r.commit), "lead");
   assert.equal(gh.message(r.commit), "Edit A\n");
   assert.equal(r.versions["A/a.md"], blobSha("three\n"));
   assert.equal((await st().readFile("main", "A/a.md")).text, "two\n");
   await assert.rejects(st("ann").writeFiles("edit/bo", { "A/a.md": "x\n" }, { message: "x" }), /only bo writes/);
 });
 
-test("a user without push access gets a fork for their branch; a collaborator's branch stays in the repo", async () => {
+test("a user without push access: the App writes their branch in the language repo, they open the pull request", async () => {
   const { gh, st } = await fresh();
   const main = gh.refs().get("main");
   await st("ann").setBranch("edit/ann", main);
-  assert.ok(gh.refs("ann/dan").has("edit/ann"));
-  assert.ok(!gh.refs().has("edit/ann"));
-  await st("lead", true).setBranch("edit/lead", main);
-  assert.ok(gh.refs().has("edit/lead"));
-  assert.ok(!gh.repos.has("lead/dan"));
-  // ann's pull request comes from her fork; anyone finds her branch through it
-  await st("ann").writeFiles("edit/ann", { "A/a.md": "ann\n" }, { message: "Edit" });
+  assert.ok(gh.refs().has("edit/ann"));
+  assert.ok(!gh.repos.has("ann/dan"));                                // no fork
+  const r = await st("ann").writeFiles("edit/ann", { "A/a.md": "ann\n" }, { message: "Edit", coAuthor: "ann" });
+  assert.equal(gh.author(r.commit), "make-tanakh-review[bot]");
+  assert.match(gh.message(r.commit), /Co-authored-by: ann </);
   const pr = await st("ann").createPR({ author: "ann", branch: "edit/ann", title: "Edits by ann" });
-  assert.equal(pr.repo, "ann/dan");
+  assert.equal(pr.author, "ann");
   assert.match(gh.pulls[0].body, /given under CC0 1\.0/);
   assert.equal((await st("rev").readFile("edit/ann", "A/a.md")).text, "ann\n");
   assert.equal(await st("rev").mergeBase("main", "edit/ann"), main);
   assert.deepEqual(await st().changedFiles("main", "edit/ann"), ["A/a.md"]);
+  // the App's user token could not have written there itself (GitHub's rule, kept by the mock)
+  const raw = await gh.fetch("https://api.github.com/repos/global-tanakh/dan/git/refs", { method: "POST",
+    headers: { Authorization: `Bearer ${gh.user("ann").token}` }, body: JSON.stringify({ ref: "refs/heads/x", sha: main }) });
+  assert.equal(raw.status, 403);
 });
 
-test("the merge commit names the fork's head; GitHub then counts the pull request as merged", async () => {
+test("a pull request from a fork made on github.com: read through its record, merged with the fork's head as parent", async () => {
   const { gh, st } = await fresh();
-  await st("ann").setBranch("edit/ann", gh.refs().get("main"));
-  await st("ann").writeFiles("edit/ann", { "A/a.md": "ann\n" }, { message: "Edit" });
-  await st("ann").createPR({ author: "ann", branch: "edit/ann", title: "Edits by ann" });
-  const { commit } = await st("rev").commitMerge("main", "edit/ann", { "A/a.md": "ann\n" }, { message: "Merge #1", coAuthor: "rev" });
-  assert.deepEqual(gh.parents(commit)[1], gh.refs("ann/dan").get("edit/ann"));
-  const p = await st().updatePR(1, { status: "merged", merged_by: "rev" });
+  const n = gh.webFork("eve", "patch-1", { "A/a.md": "eve\n" });
+  assert.equal((await st("rev").readFile("patch-1", "A/a.md")).text, "eve\n");
+  assert.deepEqual(await st().changedFiles("main", "patch-1"), ["A/a.md"]);
+  const { commit } = await st("rev").commitMerge("main", "patch-1", { "A/a.md": "eve\n" }, { message: `Merge #${n}`, coAuthor: "rev" });
+  assert.deepEqual(gh.parents(commit)[1], gh.refs("eve/dan").get("patch-1"));
+  const p = await st().updatePR(n, { status: "merged", merged_by: "rev" });
   assert.equal(p.status, "merged");
   assert.equal((await st().listPRs())[0].status, "merged");
   assert.match(gh.comments[0].body, /Merged verse by verse by rev/);

@@ -30,7 +30,7 @@ const STORES = {
   },
   async github() {
     const gh = mockGitHub(), app = gh.appToken(), cache = newCache();
-    const st = (login = null) => new GitHubStore({ owner: "global-tanakh", repo: "dan", app, fetch: gh.fetch, cache, wait: 0,
+    const st = (login = null) => new GitHubStore({ owner: "global-tanakh", repo: "dan", app, fetch: gh.fetch, cache,
       user: login ? gh.user(login, { push: login === "lead" }) : null });
     const s = st();
     await s.writeFiles("main", { ...SEED(), "roles.json": JSON.stringify({ reviewers: [], team: ["lead"] }) + "\n" }, { message: "seed" });

@@ -63,6 +63,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `src/lib/units.js` | the clause-unit model: `#` / `%`, labels, changed verses (browser and server) |
 | `src/lib/store/local-git.js` | the store: git plumbing, compare-and-swap refs, pull request records |
 | `src/lib/store/github.js` | the same store on GitHub's API (two tokens, forks, the App's token); `test/github-mock.js` is its mock GitHub |
+| `tools/github_live_test.mjs` | the live test: `setup <owner>/<repo>` makes a test App (manifest, three clicks), `run` runs the flows against a throw-away repo |
 | `src/lib/service.js` | the flows: load, save, proposal, merge, bring in main, close, reviewer request, approve |
 | `src/lib/session.js`, `oauth.js` | the sealed session cookie, the CC0 agreement; GitHub sign-in (local: sign-in by name) |
 | `src/lib/http.js`, `config.js` | route helpers; settings (`MTR_DATA`, `MTR_GITHUB_*`), the language list, the store per user |
@@ -86,11 +87,11 @@ GitHub itself. The app uses it when the five `MTR_GITHUB_*` settings are set (`.
 | `createPR`, `updatePR`, `listPRs` | `POST/GET /pulls` (open ones into main, the last ten closed), the `conflict` label, `PATCH` to close, a comment naming who merged or closed |
 | `roles()`, `setRoles()` | `roles.json` on main, written by the App |
 
-Tokens (PLAN.md 15.2 point 2): the user's own token writes their `edit/<login>` branch and opens their pull request (with the CC0
-line in its body); the App's installation token (`appTokens`: minted from the App's private key, kept until near expiry) writes
-`main`, `approved` and `roles.json`, and labels, closes and comments on pull requests. A user without push access to the language
-repo gets a fork on their first save, and their branch lives there. A save costs about 14 requests (3 of them writes), the first
-save with the fork about 25, a merge about 18 (4 writes).
+Tokens (PLAN.md 15.2 point 2): the user's own token opens their pull request (with the CC0 line in its body) and, if they can push
+to the language repo, writes their `edit/<login>` branch; the App's installation token (`appTokens`: minted from the App's private
+key, kept until near expiry) writes `main`, `approved`, `roles.json` and the branches of users without push access (the person as
+co-author: an App's user token reaches only repos the App is installed on, so not a contributor's fork), and labels, closes and
+comments on pull requests. A pull request made on github.com from a fork is read and merged like the others.
 
 **Sign-in with GitHub** (`src/lib/oauth.js`, `src/pages/auth/callback.js`): the GitHub App's user authorisation, identity only.
 The session cookie is sealed (AES-256-GCM under `MTR_SESSION_SECRET`) and holds the login and the user's token (refreshed when it

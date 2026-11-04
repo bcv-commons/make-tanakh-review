@@ -32,10 +32,8 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
     }
     return seen;
   };
-  const canPush = (actor, name) => {
-    const r = repos.get(name);
-    return actor === "app" ? name === base : !!r && (r.push.has(actor) || name.split("/")[0] === actor);
-  };
+  // the App is installed on the base repo only, and a user token of the App reaches no further than the App (GitHub's rule)
+  const canPush = (actor, name) => name === base && (actor === "app" || repos.get(base).push.has(actor));
   // a side of a compare / a PR head: "owner:branch", a branch, or a sha
   const resolve = (x, inRepo = base) => {
     if (/^[0-9a-f]{40}$/.test(x)) return objects.has(x) ? x : null;
@@ -216,6 +214,18 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
 
   return {
     fetch, calls, comments, base,
+    // a fork with a branch and a pull request made on github.com (outside the app)
+    webFork(login, branch, files, title = "From github.com") {
+      const f = `${login}/${repo}`, main = repos.get(base).refs.get("main");
+      repos.set(f, { refs: new Map([["main", main]]), fork: true, parent: base, push: new Set() });
+      const files0 = { ...objects.get(objects.get(main).tree).files };
+      for (const [path, text] of Object.entries(files)) { const s = blobSha(text); objects.set(s, { type: "blob", text }); files0[path] = s; }
+      repos.get(f).refs.set(branch, commit({ tree: tree(files0), parents: [main], message: title, author: login }));
+      const t = now();
+      pulls.push({ number: pulls.length + 1, state: "open", title, body: "", author: login, headRepo: f, headRef: branch, base: "main", labels: [],
+        created_at: t, updated_at: t });
+      return pulls.length;
+    },
     code(login) { const c = `code_${login}_${n++}`; codes.set(c, login); return c; },
     expire(token) { tokens.delete(token); },
     user(login, { push = false } = {}) {                    // a GitHub user with a token; push: a collaborator of the base repo

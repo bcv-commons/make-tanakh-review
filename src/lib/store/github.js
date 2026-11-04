@@ -3,10 +3,13 @@
 //
 // - Reads go through the Git Data API: a branch's head (refs), the commit's tree read whole (recursive), blobs by sha. Trees and
 //   blobs are content-addressed and kept in a cache shared by all instances; a file's version is its blob sha, as locally.
-// - Two tokens (15.2 point 2): the user's own token writes their branch `edit/<login>` and opens their pull request; the App's
-//   installation token writes `main` and `approved` (merges, approvals, roles.json) and labels / closes pull requests.
-// - Where a user's branch lives: in the language repo when the user has push access there, otherwise in their fork of it (made
-//   on the first save, under their token). Other users' branches are found through their pull requests.
+// - Two tokens (15.2 point 2): the user's own token opens their pull request and, when they have push access to the language
+//   repo, writes their branch `edit/<login>`; the App's installation token writes `main` and `approved` (merges, approvals,
+//   roles.json), labels / closes / comments on pull requests, and writes the branch of a user without push access.
+// - Every user's branch is in the language repo (decided 2026-11-04, PLAN.md log): an App's user token reaches only repos the
+//   App is installed on, so not a contributor's own fork. The App writes such a branch only through this app, only as
+//   `edit/<login>` of the signed-in user, with the person as co-author. A pull request made on github.com from a fork is found
+//   through its record and merged like any other.
 // - A write is one commit: a tree on top of the head's tree, a commit, then the ref moved without force. GitHub refuses a move
 //   that is not a fast-forward, so a branch that moved since it was read is refused (StaleError), as `update-ref` with the old
 //   value does locally.
@@ -30,18 +33,18 @@ export const blobSha = (text) => {
 };
 
 // Kept across requests: objects (commit -> its tree sha, tree -> {path: blob sha}, blob -> text; immutable, oldest dropped
-// first) and where users' branches live ("owner/repo|login" -> "owner/repo"; a fork does not move).
-export const newCache = () => ({ objects: new Map(), homes: new Map() });
+// first) and who may push to which repo ("owner/repo|login" -> true / false; looked up once).
+export const newCache = () => ({ objects: new Map(), push: new Map() });
 const shared = newCache();
 const MAX_OBJECTS = 20000;
 
 export class GitHubStore {
   // owner/repo: the language repo; app: async () => installation token; user: { login, token } | null;
   // fetch: the HTTP client (a mock in the tests)
-  constructor({ owner, repo, app, user = null, api = "https://api.github.com", fetch = globalThis.fetch, wait = 1000, cache = shared }) {
-    Object.assign(this, { owner, repo, app, user, api, fetch, wait });
+  constructor({ owner, repo, app, user = null, api = "https://api.github.com", fetch = globalThis.fetch, cache = shared }) {
+    Object.assign(this, { owner, repo, app, user, api, fetch });
     this.objects = cache.objects;
-    this.homes = cache.homes;
+    this.push = cache.push;
     this.base = `${owner}/${repo}`;
     this.refs = new Map();       // "repo|branch" -> sha | null, for this request
     this.prs = null;             // the pull requests, for this request
@@ -71,37 +74,21 @@ export class GitHubStore {
 
   mine(branch) { return !!this.user && branch === `edit/${this.user.login}`; }
 
-  // The repository that holds `branch` ("owner/repo"); write: the user's own branch, making their fork if they need one.
-  async where(branch, { write = false } = {}) {
-    if (branch === MAIN || branch === APPROVED || SHA.test(branch)) return this.base;
-    if (this.mine(branch)) return this.home(write);
+  // The repository that holds `branch` ("owner/repo"): the language repo, or a fork when a pull request from github.com says so.
+  async where(branch) {
+    if (branch === MAIN || branch === APPROVED || SHA.test(branch) || this.mine(branch)) return this.base;
     const pr = (await this.listPRs()).find((p) => p.branch === branch && p.status !== "merged" && p.status !== "closed");
     return pr && pr.repo ? pr.repo : this.base;
   }
 
-  // The user's own repo for their branch: the language repo when they can push to it, else their fork (made when `make`).
-  async home(make) {
+  // whether the signed-in user can push to the language repo (then their own token writes their branch)
+  async pushes() {
     const key = `${this.base}|${this.user.login}`;
-    if (this.homes.has(key)) return this.homes.get(key);
-    const token = this.user.token;
-    const repo = await this.call("GET", `/repos/${this.base}`, { token });
-    let home = null;
-    if (repo.permissions && repo.permissions.push) home = this.base;
-    else {
-      const f = await this.call("GET", `/repos/${this.user.login}/${this.repo}`, { token, ok404: true });
-      if (f && f.fork && f.parent && f.parent.full_name === this.base) home = f.full_name;
-      else if (make) {
-        home = (await this.call("POST", `/repos/${this.base}/forks`, { token, body: { default_branch_only: true } })).full_name;
-        // GitHub makes the fork in the background: wait until its main is there before writing to it
-        for (let i = 0; !(await this.call("GET", `/repos/${home}/git/ref/heads/${MAIN}`, { token, ok404: true })); i++) {
-          if (i >= 10) throw new GitHubError(504, `the fork ${home} is not ready yet: save again in a minute`);
-          await new Promise((r) => setTimeout(r, this.wait));
-        }
-      }
+    if (!this.push.has(key)) {
+      const repo = await this.call("GET", `/repos/${this.base}`, { token: this.user.token });
+      this.push.set(key, !!(repo.permissions && repo.permissions.push));
     }
-    if (!home) return this.base;     // no fork yet: the user's branch is nowhere, reads find nothing
-    this.homes.set(key, home);
-    return home;
+    return this.push.get(key);
   }
 
   async headIn(repo, branch) {
@@ -187,7 +174,8 @@ export class GitHubStore {
   // ---- writing
 
   async writer(branch) {
-    if (this.mine(branch)) return { repo: await this.where(branch, { write: true }), token: this.user.token, byUser: true };
+    if (this.mine(branch) && await this.pushes()) return { repo: this.base, token: this.user.token, byUser: true };
+    if (this.mine(branch)) return { repo: this.base, token: await this.appToken(), byUser: false };
     if (branch.startsWith("edit/")) throw new GitHubError(403, `only ${branch.slice(5)} writes ${branch}`);
     return { repo: this.base, token: await this.appToken(), byUser: false };
   }
@@ -271,11 +259,10 @@ export class GitHubStore {
     return this.prs;
   }
 
-  // The user's own pull request from their branch (wherever it lives); the CC0 agreement is in its body (PLAN.md 15.2 point 4).
+  // The user's own pull request from their branch, under their token; the CC0 agreement is in its body (PLAN.md 15.2 point 4).
   async createPR({ author, branch, title, base = MAIN }) {
     if (!this.user || author !== this.user.login) throw new GitHubError(403, "a pull request is opened by its author");
-    const repo = await this.where(branch, { write: true });
-    const head = repo === this.base ? branch : `${repo.split("/")[0]}:${branch}`;
+    const head = branch;
     const body = `Edits by ${author} in make-tanakh-review, given under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).`;
     const p = await this.call("POST", `/repos/${this.base}/pulls`, { token: this.user.token, body: { title, head, base, body } });
     this.prs = null;
@@ -333,7 +320,9 @@ export function appTokens({ appId, privateKey, org, api = "https://api.github.co
   return async () => {
     if (cur && cur.until > now()) return cur.token;
     const j = jwt();
-    if (!installation) installation = (await call("GET", `/orgs/${org}/installation`, j)).id;
+    // installed on the organisation (or, for a test, on a user account of that name)
+    if (!installation) installation = (await call("GET", `/orgs/${org}/installation`, j).catch((e) =>
+      e.status === 404 ? call("GET", `/users/${org}/installation`, j) : Promise.reject(e))).id;
     const t = await call("POST", `/app/installations/${installation}/access_tokens`, j);
     cur = { token: t.token, until: Date.parse(t.expires_at) - 5 * 60 * 1000 };
     return cur.token;

@@ -102,8 +102,8 @@ test("languages are the organisation's repos with the topic; a store per user wi
   const user = await session.currentUser(cookies, { fetch: gh.fetch });
   const mine = await config.storeFor("dan", user);
   assert.deepEqual(mine.user, { login: "ann", token: user.token });
-  // the App's token (from the key above) writes main; ann's own token writes her branch, in her fork
+  // the App's token (from the key above) writes main, and ann's branch (she has no push access)
   await reader.writeFiles("main", { "README.md": "readme\n" }, { message: "seed" });
   await mine.setBranch("edit/ann", await reader.branchHead("main"));
-  assert.ok(gh.refs("ann/dan").has("edit/ann"));
+  assert.ok(gh.refs().has("edit/ann"));
 });

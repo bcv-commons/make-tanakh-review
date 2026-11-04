@@ -197,8 +197,7 @@ In detail (2026-11-03, as the code expects it):
 - **The language repos:** public, topic `global-tanakh` (the language list), `roles.json` on main, branches `main` and `approved`.
 - **The Netlify site:** `MTR_GITHUB_APP_ID`, `MTR_GITHUB_PRIVATE_KEY`, `MTR_GITHUB_CLIENT_ID`, `MTR_GITHUB_CLIENT_SECRET`,
   `MTR_GITHUB_ORG`, `MTR_SESSION_SECRET` (`.env.example`).
-- **Open (see the log, 2026-11-03):** where an outside contributor's branch lives, since an App's user token reaches only
-  repositories the App is installed on.
+- **Branches:** every `edit/<login>` branch lives in the language repo (the log, 2026-11-04); leave `edit/*` unprotected.
 
 ## Log (changes while building)
 
@@ -285,6 +284,9 @@ In detail (2026-11-03, as the code expects it):
   branches in the language repo with its own token, the person as co-author (as the local test does; costs the App's shared rate
   limit), (c) an OAuth App with the `public_repo` scope instead (broad: it could write any public repo of the user). GitHubStore
   as written does (a) and, for collaborators, the language repo; (b) is a small change in `writer()` / `home()`.
+  **Decided (user, 2026-11-04): (b).** GitHubStore no longer makes forks: every `edit/<login>` branch is in the language repo,
+  written with the user's token when they can push there and by the App otherwise (co-authored by them); the user's token
+  still opens their pull request. The mock now refuses an App user token outside the repos the App is installed on.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
