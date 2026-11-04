@@ -141,6 +141,7 @@ for (const [kind, fresh] of Object.entries(STORES)) {
   test(`${kind}: closing a proposal`, async () => {
     const { st } = await fresh();
     await edit(st, "ann", 2, "Min tjener er nu død.");
+    assert.deepEqual(await S.updateBranch(st("ann"), "ann"), { conflicts: [], merged: true });   // main has nothing new: no files
     await assert.rejects(S.closePR(st("bo"), "bo", 1), /author or a reviewer/);
     await S.closePR(st("ann"), "ann", 1);
     assert.equal((await st().listPRs()).find((p) => p.number === 1).status, "closed");

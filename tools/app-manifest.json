@@ -2,7 +2,7 @@
   "name": "make-tanakh-review",
   "url": "https://SITE",
   "redirect_url": "https://SITE/api/app/created",
-  "callback_urls": ["https://SITE/api/oauth/callback"],
+  "callback_urls": ["https://SITE/auth/callback"],
   "request_oauth_on_install": true,
   "setup_on_update": false,
   "public": false,

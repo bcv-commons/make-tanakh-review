@@ -288,6 +288,14 @@ In detail (2026-11-03, as the code expects it):
   written with the user's token when they can push there and by the App otherwise (co-authored by them); the user's token
   still opens their pull request. The mock now refuses an App user token outside the repos the App is installed on.
 
+- **2026-11-04: the live test passed** (`tools/github_live_test.mjs run`, a private throw-away repo and a test App on the user's
+  account): seed, two saves into one pull request, a stale save refused, reviewer access, the conflict label, the merge (GitHub
+  marks the pull request merged), approval, the App-written branch of a user without push access (simulated: one account),
+  bringing in main, closing. On GitHub the user's own saves are authored by them and everything the App writes by the bot with
+  the person as co-author. Found: GitHub refuses a tree with no entries ("Invalid tree info"), which a merge with no file
+  changes sent; such a commit now reuses the head's tree, and the mock refuses an empty tree as GitHub does. One run met a
+  passing 502 on opening a pull request (the pull request was made all the same); a rerun passed.
+
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
 1. Decisions (user): name and place (proposed bcv-commons/make-tanakh-review; local checkout next to the other bcv-commons repos,

@@ -182,8 +182,10 @@ export class GitHubStore {
 
   async commitTo(w, branch, head, files, parents, message, coAuthor) {
     const token = w.token;
-    const tree = await this.call("POST", `/repos/${w.repo}/git/trees`, { token, body: {
-      ...(head ? { base_tree: (await this.get(`/repos/${w.repo}/git/commits/${head}`)).tree.sha } : {}),
+    const baseTree = head ? (await this.get(`/repos/${w.repo}/git/commits/${head}`)).tree.sha : null;
+    // no file changes (a merge that only joins the histories): the head's tree as it is; GitHub refuses an empty tree list
+    const tree = !Object.keys(files).length && baseTree ? { sha: baseTree } : await this.call("POST", `/repos/${w.repo}/git/trees`, { token, body: {
+      ...(baseTree ? { base_tree: baseTree } : {}),
       tree: Object.entries(files).map(([path, content]) => ({ path, mode: "100644", type: "blob", content })),
     } });
     // the App writes as the bot with the person as co-author; a user's own commit is authored by them

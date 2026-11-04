@@ -138,7 +138,7 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
     }
     if (rest === "/git/trees" && method === "POST") {
       const files = body.base_tree ? { ...(objects.get(body.base_tree)?.files || {}) } : {};
-      if (body.base_tree && !objects.has(body.base_tree)) return [422, { message: "Invalid tree info" }];
+      if (body.base_tree && !objects.has(body.base_tree) || !body.tree?.length) return [422, { message: "Invalid tree info" }];   // as GitHub
       for (const e of body.tree) {
         if (e.content != null) { const s = blobSha(e.content); objects.set(s, { type: "blob", text: e.content }); files[e.path] = s; }
         else if (e.sha === null) delete files[e.path];
