@@ -231,7 +231,7 @@ In detail (2026-11-03, as the code expects it):
   before its first token (opening `>>` goes with it) to the next unit; joined with one space the units give the verse back.
   A text edit projects that verse's `.align` positions and `.notes` anchors across a token diff (`src/lib/align.js`, 16.2 step 1)
   and sets its profile to `s`; a re-cut only rewrites `.units` (header `edited`). Merges go verse by verse over all four files.
-  Verified on `.local/repos/dan-v2.git`: all 299 chapters hash, round-trip byte for byte, and build back unchanged from the
+  Verified on `.local/repos/dan-v2.git` (renamed `dan.git` 2026-11-04): all 299 chapters hash, round-trip byte for byte, and build back unchanged from the
   editor's units (8,237 verses, 33,432 units, no scattered ranges, every token in one unit); an HTTP save on a copy gave a commit
   whose sidecars all hash. Word-level link hover (`links/1`) is retired with `links.js`: per-word statuses need the MACULA
   ordinals of the `.align` rows (16.3).
@@ -328,7 +328,14 @@ In detail (2026-11-03, as the code expects it):
   word's lexeme in compact-alignments' `_index/<BOOK>_lexemes.json` / `_fn.json` (fetched by `tools/fetch_index.mjs` with
   the keys), trims noise (forms seen once or under 5%) and shows up to four; `tools/build_glosses.py` and the app-side tables
   are gone. The glosses menu: the translation (default; the draft's own word, else the commonest in italics), English (MACULA),
-  none. The local test repo `dan-v2.git` carries a copy made from make-tanakh's trial counts (431 chapters).
+  none. The local test repo `dan.git` carries a copy made from make-tanakh's trial counts (431 chapters).
+- **2026-11-04: the local test repo `dan-v2.git` is now `dan.git`** (user's go); the old-format `dan.git` (`.tsv` /
+  `.links.json`) and its state file moved to `.local/retired/`.
+- **2026-11-04: lexeme-aligner agreed to publish `lexeme-alignments/iso=<iso>/top.json`** (`lexeme-glosses/1`): per lexeme the
+  commonest renderings, counted once per occurrence from its final published alignment (span extension, then eflomal, gloss,
+  gap fill), function words and multi-word renderings included, all the language's editions pooled (`sources`), at most 8
+  forms, `revision` = the dataset tag. Danish first, then every language. The editor will take it as the fallback where a
+  language repo has no `.tanakh/glosses.json`, read by a pinned revision.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

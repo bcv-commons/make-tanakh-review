@@ -1,4 +1,4 @@
-// The chapter format against the files the grammar side seeded (.local/repos/dan-v2.git, 299 Danish chapters; skipped when the
+// The chapter format against the files the grammar side seeded (.local/repos/dan.git, 299 Danish chapters; skipped when the
 // test repo is not there): the text hash of every sidecar, byte-exact round trips, the tokeniser against the token ranges, and
 // the unit cut built back to the same .units rows.
 import { test } from "node:test";
@@ -12,7 +12,7 @@ import { TOKENIZER_VERSION as VENDORED } from "../src/lib/vendor/tokenize.js";
 import { readChapter, buildChapter, unitsRow } from "../src/lib/chapter.js";
 import { byVerse } from "../src/lib/units.js";
 
-const REPO = path.resolve(".local/repos/dan-v2.git");
+const REPO = path.resolve(".local/repos/dan.git");
 const have = fs.existsSync(REPO);
 const git = (...a) => execFileSync("git", ["--git-dir", REPO, ...a], { encoding: "utf8", maxBuffer: 1 << 30 });
 
@@ -46,7 +46,7 @@ test("the text hash: integers, numeric order, no trailing newline", () => {
   assert.equal(F.hashInput(v), "1:2:a\n1:10:b");
 });
 
-test("dan-v2: every sidecar hash, every round trip, every range, every cut", { skip: !have && "no .local/repos/dan-v2.git" }, () => {
+test("dan: every sidecar hash, every round trip, every range, every cut", { skip: !have && "no .local/repos/dan.git" }, () => {
   const all = chapters();
   assert.equal(all.size, 299);
   const sha = (s) => crypto.createHash("sha256").update(s, "utf8").digest("hex");
