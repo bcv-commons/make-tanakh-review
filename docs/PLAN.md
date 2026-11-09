@@ -336,6 +336,16 @@ In detail (2026-11-03, as the code expects it):
   gap fill), function words and multi-word renderings included, all the language's editions pooled (`sources`), at most 8
   forms, `revision` = the dataset tag. Danish first, then every language. The editor will take it as the fallback where a
   language repo has no `.tanakh/glosses.json`, read by a pinned revision.
+- **2026-11-09: alternative drafts, at make-tanakh-grammar's request** (FORMAT.md section 9). Besides the main draft it
+  publishes the same chapter by other methods (`nllb`, `shape`) under `.tanakh/alternatives/<kind>/`, four files each,
+  written only by the publisher. Their agreement with the main draft is a review signal (Zinza John 1-4: main-draft words in
+  both alternatives' clause right 77 %, in neither 21 %), and is computed in the editor from the current files, with no
+  stored file (it would go stale with any edit). Built: `src/lib/alternatives.js` (words per clause, agreement, shading);
+  `load` reads them from main; the editor shows each alternative's words under the clause (a "use" button puts them in the
+  box, with an undo), shades the box's words (strong: in no alternative; light: in some), and a bar menu turns them off.
+  The check (validate.mjs) gives them every chapter check plus their own keys; `layout_keys.py` takes their books. Not
+  done: the per-token hover (the box lies over the shading); their offer of `main_text: <sha256>` in the front matter is
+  left open (not needed while the shading compares the current text).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

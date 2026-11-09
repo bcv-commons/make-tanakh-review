@@ -1,6 +1,7 @@
 // The editor in the browser (PLAN.md section 6): renders verse by verse, applies # and % as they are typed, saves the chapter.
 import { applyBox, split, join, toBox, fromBox, byVerse, atoms, clauseKey } from "../lib/units.js";
 import { poemLines } from "../lib/poetry.js";
+import { forUnit, agreement, shade } from "../lib/alternatives.js";
 
 // The status of a verse's alignment, from its .align profile letter (template/FORMAT.md section 2)
 const PROFILE = { a: ["aligned by script", ""], b: ["aligned by an agent", ""], h: ["links checked by a person", "ok"],
@@ -25,7 +26,9 @@ const sig = (u) => JSON.stringify([u.bases, u.text.trim()]);
 
 export function start(data) {
   const g = localGet("mtr-glosses", "da");
-  S = { ...data, glossTable: data.glosses, dirty: false, glosses: g === "en" || g === "0" ? g : "da", msg: "", err: false };
+  const a = localGet("mtr-alts", "all");
+  S = { ...data, glossTable: data.glosses, dirty: false, glosses: g === "en" || g === "0" ? g : "da", msg: "", err: false,
+    alts: ["all", "shade", "off"].includes(a) ? a : "all", undo: null };
   S.mainSigs = new Map([...byVerse(S.main)].map(([r, l]) => [r, new Set(l.map(sig))]));
   S.mainVerse = new Map([...byVerse(S.main)].map(([r, l]) => [r, JSON.stringify(l.map(sig))]));
   S.savedText = verseTexts(S.units);
@@ -61,6 +64,14 @@ function renderBar() {
   bar.append(el("label", { class: "toggle", title: "What stands under each Hebrew word" }, "glosses ",
     el("select", { onchange: (e) => { S.glosses = e.target.value; localSet("mtr-glosses", S.glosses); render(); } },
       opt("da", S.langName || "the translation"), opt("en", "English (MACULA)"), opt("0", "none"))));
+  if ((S.alternatives || []).length) {
+    const o = (v, label) => el("option", { value: v, selected: S.alts === v }, label);
+    bar.append(el("label", { class: "toggle", title: `The other drafts of this chapter (${S.alternatives.map((x) => x.kind).join(", ")}), read only: `
+      + "under each clause, and the main text's words shaded where they have them not (strong: none has the word; light: some have it)" },
+      "other drafts ", el("select", { onchange: (e) => { S.alts = e.target.value; localSet("mtr-alts", S.alts); render(); } },
+        o("all", "shown, with shading"), o("shade", "shading only"), o("off", "off"))));
+  }
+  if (S.undo) bar.append(el("button", { onclick: undoUse, title: "Put back the clause's text from before" }, `Undo “use ${S.undo.kind}”`));
   if (S.msg) bar.append(el("span", { class: S.err ? "err" : "note" }, S.msg));
 }
 
@@ -159,7 +170,8 @@ function render(focus = null, caret = null) {
     const heb = hebrewCell(verse.split(":")[1], u, seen);
     block.append(el("div", { class: `row${changed ? " changed" : ""}` }, heb,
       el("div", { class: "tgt" }, el("span", { class: "lab", title: "Hebrew clause(s) this unit renders" }, labels[i]),
-        el("div", { class: "boxwrap" }, el("div", { class: "mirror", "data-i": i, "aria-hidden": "true" }), ta), tools)));
+        el("div", { class: "boxwrap" }, paint(el("div", { class: "mirror", "data-i": i, "aria-hidden": "true" }), u), ta), tools,
+        S.alts === "all" ? altsOf(i, u) : null)));
   });
   const texts = verseTexts(S.units);
   for (const [ref, b] of blocks) { const p = poemOf(ref, texts[ref]); if (p) b.append(p); const n = notesOf(ref); if (n) b.append(n); }
@@ -170,9 +182,59 @@ function render(focus = null, caret = null) {
   }
 }
 
+// The main text's words the other drafts do not have (FORMAT.md section 9), shaded in the mirror behind the box: computed from
+// the current text on every change. Strong: no other draft has the word in this clause; light: some have it.
+function paint(m, u) {
+  m.replaceChildren();
+  if (S.alts === "off" || !(S.alternatives || []).length) return m;
+  const s = u.text, nfc = s.normalize("NFC");
+  if (nfc !== s) return m;                       // offsets would not match the box
+  const ag = agreement(S.alternatives, u);
+  if (!ag.available) return m;
+  let at = 0;
+  for (const t of ag.tokens) {
+    const sh = shade(ag.available, t.support);
+    if (sh === "none") continue;
+    m.append(toBox(s.slice(at, t.start)), el("mark", { class: `alt-${sh}` }, toBox(s.slice(t.start, t.end))));
+    at = t.end;
+  }
+  m.append(toBox(s.slice(at)));
+  return m;
+}
+
+// Under a clause: what each other draft has for the same Hebrew clause(s), read only, with a button that puts it in the box
+function altsOf(i, u) {
+  const list = forUnit(S.alternatives, u);
+  if (!list.length) return null;
+  return el("div", { class: "alts" }, list.map((a) => {
+    const text = a.units.map((x) => x.text).join(" ");
+    return el("div", { class: "alt" }, el("span", { class: "akind", title: a.about }, a.kind),
+      text ? el("span", { class: "atext" }, text) : el("span", { class: "atext none", title: "This draft has no words for this clause (its notes may say why)" }, "—"),
+      text && canEdit() ? el("button", { class: "use", title: `Put ${a.kind}'s words in this clause's box (an ordinary edit: save to keep it)`,
+        onclick: () => useAlt(i, a.kind, text) }, "use") : null);
+  }));
+}
+
+function useAlt(i, kind, text) {
+  const old = S.units[i].text;
+  S.units = S.units.map((x, k) => (k === i ? { ...x, text } : x));
+  S.dirty = true; S.undo = { i, text: old, kind, ref: S.units[i].ref };
+  S.msg = "";
+  render(i);
+}
+
+function undoUse() {
+  const u = S.undo;
+  if (!u || !S.units[u.i] || S.units[u.i].ref !== u.ref) { S.undo = null; renderBar(); return; }
+  S.units = S.units.map((x, k) => (k === u.i ? { ...x, text: u.text } : x));
+  S.undo = null;
+  render(u.i);
+}
+
 function autosize(t) { t.style.height = "auto"; t.style.height = `${t.scrollHeight + 2}px`; }
 
 function apply(r, focus, caret) {
+  S.undo = null;
   if (r.error) { S.units = r.units; say(r.error, true); render(focus, caret); return; }
   S.units = r.units; S.dirty = true; S.msg = "";
   render(focus, caret);
@@ -188,8 +250,10 @@ function onInput(i, ta) {
     return;
   }
   S.units = r.units;
-  if (!S.dirty) { S.dirty = true; renderBar(); }
+  if (S.undo || !S.dirty) { S.undo = null; S.dirty = true; renderBar(); }
   autosize(ta);
+  const m = ta.parentNode.querySelector(".mirror");
+  if (m) paint(m, S.units[i]);
   const row = ta.closest(".row");
   row.classList.toggle("changed", !(S.mainSigs.get(S.units[i].ref) || new Set()).has(sig(S.units[i])));
 }
@@ -208,7 +272,7 @@ async function save() {
   say("Saving…");
   const r = await post("/api/save", { lang: S.lang, file: S.file, units: S.units, version: S.version });
   if (!r.ok) { say(r.error || `Not saved (${r.status}).`, true); return; }
-  S.version = r.version; S.dirty = false;
+  S.version = r.version; S.dirty = false; S.undo = null;
   for (const ref of Object.keys(S.verses || {})) if (verseTexts(S.units)[ref] !== S.savedText[ref]) S.verses[ref] = { ...S.verses[ref], profile: "s", stale: false };
   S.savedText = verseTexts(S.units);
   render();

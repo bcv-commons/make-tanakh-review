@@ -5,6 +5,8 @@
 //
 // --keys: the clause keys of the pinned layout per verse (layout_keys.py); without it the keys are not checked (said once).
 // --changed: the files a pull request changes (one per line); files other than chapter files are named in a notice.
+// Alternative drafts (`.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.*`, FORMAT.md section 9) are chapters too and get every
+// chapter check, plus their own front matter keys.
 // format.js and vendor/tokenize.js are copies of make-tanakh-review's src/lib/format.js and src/lib/vendor/tokenize.js (its
 // tests keep them identical); the tokeniser is the published reference of bcv-commons/compact-alignments.
 import crypto from "node:crypto";
@@ -17,6 +19,8 @@ import {
 } from "./format.js";
 
 const CHAPTER = /^([A-Z0-9]{3})\/\1_(\d{3})\.(md|units|notes|align)$/;
+const ALT = /^\.tanakh\/alternatives\/([a-z0-9-]+)\/([A-Z0-9]{3})\/\2_(\d{3})\.(md|units|notes|align)$/;
+const ALT_DIR = ".tanakh/alternatives/", ALT_README = `${ALT_DIR}README.md`;
 const BOOK_DIR = /^[A-Z0-9]{3}\//;
 const SIDECARS = ["units", "notes", "align"];
 const NOTE_KINDS = new Set(["T", "E", "H", "N"]);
@@ -46,6 +50,9 @@ export function validate(files, { keys = null, changed = null } = {}) {
 
   for (const [file, text] of files) {
     for (const [re, what] of SECRETS) if (re.test(text)) err(file, `looks like ${what}: never commit secrets`, lineOf(text, text.split("\n").find((l) => re.test(l))));
+    const a = ALT.exec(file);
+    if (a) { const base = file.replace(/\.\w+$/, ""); if (!chapters.has(base)) chapters.set(base, { book: a[2], ch: Number(a[3]), alt: a[1] }); chapters.get(base)[a[4]] = text; continue; }
+    if (file.startsWith(ALT_DIR)) { if (file !== ALT_README) err(file, "not a file of the alternative drafts: .tanakh/alternatives/ holds README.md and <kind>/<BOOK>/<BOOK>_<CCC>.md, .units, .notes, .align (FORMAT.md section 9)"); continue; }
     const m = CHAPTER.exec(file);
     if (m) { const base = file.replace(/\.\w+$/, ""); if (!chapters.has(base)) chapters.set(base, { book: m[1], ch: Number(m[2]) }); chapters.get(base)[m[3]] = text; continue; }
     if (BOOK_DIR.test(file) && !file.startsWith(".")) err(file, "not a chapter file: a book folder holds <BOOK>_<CCC>.md, .units, .notes and .align only");
@@ -56,11 +63,21 @@ export function validate(files, { keys = null, changed = null } = {}) {
   const unchecked = new Set();
   for (const [base, c] of [...chapters].sort()) {
     const f = (ext) => `${base}.${ext}`;
+    if (c.alt) {
+      const missing = ["md", ...SIDECARS].filter((ext) => c[ext] === undefined);
+      if (c.md !== undefined && missing.length) err(f(missing[0]), `an alternative draft has all four files: ${missing.map((x) => f(x)).join(", ")} missing`);
+      if (!files.has(`${c.book}/${c.book}_${String(c.ch).padStart(3, "0")}.md`)) notices.push({ file: f("md"), msg: `an alternative of ${c.book} ${c.ch}, which the repository does not have` });
+    }
     if (c.md === undefined) { for (const ext of SIDECARS) if (c[ext] !== undefined) err(f(ext), `a sidecar without its text file ${f("md")}`); continue; }
     const md = parseMd(c.md);
     for (const e of md.errors) { const n = /^line (\d+)/.exec(e); err(f("md"), e, n ? Number(n[1]) : undefined); }
     if (!md.front.includes(`book: ${c.book}`)) err(f("md"), `front matter: no line "book: ${c.book}"`, 2);
     if (!md.front.includes(`chapter: ${c.ch}`)) err(f("md"), `front matter: no line "chapter: ${c.ch}"`, 2);
+    if (c.alt) {
+      const kind = md.front.find((l) => /^alternative:/.test(l)), built = md.front.find((l) => /^built:/.test(l));
+      if (!kind || !new RegExp(`^alternative:\\s*"${c.alt}"\\s*$`).test(kind)) err(f("md"), `front matter: an alternative draft needs the line alternative: "${c.alt}" (its folder's kind)`, 2);
+      if (!built || !/^built:\s*"\d{4}-\d{2}-\d{2}"\s*$/.test(built)) err(f("md"), `front matter: an alternative draft needs the line built: "YYYY-MM-DD"`, 2);
+    }
     const verses = mdVerses(md), count = new Map();
     for (const v of verses) {
       const line = lineOf(c.md, `${v.ref}\t`);
@@ -77,11 +94,12 @@ export function validate(files, { keys = null, changed = null } = {}) {
       if (!h) err(f(ext), "no `# text <sha256>` line in the header");
       else if (h !== hash) err(f(ext), `stale: its text hash does not match ${f("md")} (the text changed without this file)`, lineOf(c[ext], "# text "));
     }
-    if (c.units === undefined) notices.push({ file: f("md"), msg: "no .units file: the editor cannot open this chapter" });
+    if (c.units === undefined && !c.alt) notices.push({ file: f("md"), msg: "no .units file: the editor cannot open this chapter" });
 
     if (c.units !== undefined) {
       const U = parseUnits(c.units);
       if (!UNITS_HEADER.test(c.units)) err(f("units"), "the first line must be `# units: authored | aligned | edited | migrated; ...`", 1);
+      else if (c.alt && !/^# units: (authored|migrated)\b/.test(c.units)) err(f("units"), "an alternative draft is written in clause lines: `# units: authored; ...`", 1);
       for (const e of U.errors) err(f("units"), e, lineOf(c.units, `${e.split(":")[0]}\t`));
       const layout = keys ? keys[c.book] : null;
       if (keys && !layout) unchecked.add(c.book);
@@ -143,10 +161,18 @@ export function validate(files, { keys = null, changed = null } = {}) {
       });
     }
   }
+  const kinds = new Set([...chapters.values()].filter((c) => c.alt).map((c) => c.alt));
+  if (kinds.size) {
+    const readme = files.get(ALT_README);
+    if (readme === undefined) err(ALT_README, `missing: one line per kind of alternative draft (${[...kinds].sort().join(", ")})`);
+    else for (const k of [...kinds].sort()) if (!readme.split("\n").some((l) => l.trim().startsWith(`- \`${k}\``))) err(ALT_README, `no line "- \`${k}\` (...)" for the alternative drafts in .tanakh/alternatives/${k}/`);
+  }
   for (const b of unchecked) notices.push({ file: b, msg: `${b}: not in the pinned Hebrew layout, its clause keys are not checked` });
 
   if (changed) {
-    const other = changed.filter((p) => p && !CHAPTER.test(p));
+    const alts = changed.filter((p) => p && p.startsWith(ALT_DIR));
+    if (alts.length) notices.push({ file: "", msg: `this pull request changes the alternative drafts (${alts.length} files under ${ALT_DIR}): only the publisher writes them, they are never edited` });
+    const other = changed.filter((p) => p && !CHAPTER.test(p) && !p.startsWith(ALT_DIR));
     if (other.length) notices.push({ file: "", msg: `this pull request changes files other than chapter files (${other.join(", ")}): it is merged on github.com, not in the editor` });
   }
   return { errors, notices, chapters: chapters.size };

@@ -3,6 +3,7 @@
 // merge a pull request, close, request reviewer access, approve a chapter. Routes call these; they hold no state of their own.
 // A chapter is four files (template/FORMAT.md): `file` names its .md; the .units, .notes and .align beside it travel with it.
 import { renderings, wordLexemes, chapterGlosses } from "./renderings.js";
+import { ALT_FILE, ALT_DIR, altPath, altUnits, readmeLines } from "./alternatives.js";
 import { changedVerses } from "./units.js";
 import { readChapter, buildChapter, mergeChapter, verseInfo, display, EXTS, sibling, chapterOf } from "./chapter.js";
 import { StaleError } from "./store/errors.js";
@@ -65,7 +66,27 @@ export async function load(store, login, file, { index = null } = {}) {
   return { branch, pr, units: cur.list, version: cur.versions, main: unitsOf(await model(store, MAIN, file)),
     approved: unitsOf(await model(store, APPROVED, file)), verses: verseInfo(cur), ...display(cur), poetry: await poetry(store, branch, file, cur, index),
     renderings: cur.align && !cur.stale.align ? renderings(index, { book: file.slice(0, 3), verses: cur.verses, align: cur.align.rows }) : {},
-    glosses: chapterGlosses(await glossTable(store), wordLexemes(index, file.slice(0, 3), cur.verses.map((v) => v.ref))) };
+    glosses: chapterGlosses(await glossTable(store), wordLexemes(index, file.slice(0, 3), cur.verses.map((v) => v.ref))),
+    alternatives: await alternatives(store, file) };
+}
+
+// The chapter's alternative drafts on main (FORMAT.md section 9), read only: [{ kind, about, built, verses }] by kind, each with
+// its words per verse (alternatives.js altUnits). One whose units do not match its own text is left out.
+async function alternatives(store, file) {
+  const kinds = (await store.listFiles(MAIN, ALT_DIR)).map((f) => ALT_FILE.exec(f))
+    .filter((m) => m && m[4] === "md" && `${m[2]}/${m[2]}_${m[3]}.md` === file).map((m) => m[1]).sort();
+  if (!kinds.length) return [];
+  const about = readmeLines((await store.readFile(MAIN, `${ALT_DIR}README.md`))?.text);
+  const out = [];
+  for (const kind of kinds) {
+    const texts = {};
+    for (const ext of EXTS) texts[ext] = (await store.readFile(MAIN, altPath(kind, file, ext)))?.text ?? null;
+    const ch = readChapter(texts);
+    if (!ch || ch.stale.units) continue;
+    const built = /^built:\s*"?([\d-]+)"?\s*$/.exec((ch.md.front || []).find((l) => l.startsWith("built:")) || "");
+    out.push({ kind, about: about[kind] || kind, built: built ? built[1] : null, verses: altUnits(ch.verses, ch.units.verses) });
+  }
+  return out;
 }
 
 // The language's commonest renderings per Hebrew lexeme: `.tanakh/glosses.json` on main (FORMAT.md section 8), published with the

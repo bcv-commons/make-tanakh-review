@@ -94,3 +94,13 @@ mark.check, .mirror mark.check { background: var(--check-bg); outline: 1px dashe
 .poem .pl.l0 { color: var(--muted); }
 .poem .pl.l1 { padding-left: 0; } .poem .pl.l2 { padding-left: 1.5em; } .poem .pl.l3 { padding-left: 3em; }
 .notes .nkind { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+/* other drafts of the chapter (FORMAT.md section 9): under each clause, and the agreement shading in the mirror */
+.alts { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 1px; margin-top: 2px; font-size: 13px; color: var(--muted); }
+.alt { display: flex; gap: 6px; align-items: baseline; }
+.alt .akind { font: 10px/1.4 ui-monospace, monospace; text-transform: uppercase; min-width: 4.5em; flex: none; cursor: help; }
+.alt .atext { flex: 1; } .alt .atext.none { opacity: .6; }
+.alt .use { padding: 0 6px; font-size: 11px; flex: none; }
+:root { --alt-nil: #f6d3c4; --alt-some: #fbeee6; }
+@media (prefers-color-scheme: dark) { :root { --alt-nil: #5a2f20; --alt-some: #3a2a22; } }
+.mirror mark.alt-nil { background: var(--alt-nil); color: transparent; }
+.mirror mark.alt-some { background: var(--alt-some); color: transparent; }

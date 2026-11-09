@@ -3,7 +3,8 @@
     python3 .github/check/layout_keys.py <repo root> <out.json> [--cache DIR]
 
 Reads .tanakh/layout.json (dataset and revision of bcv-commons/hebrew-clause-layout), fetches data/clauses-<BOOK>.parquet at
-that revision from Hugging Face for every Hebrew book folder in the repository (kept in --cache), and writes
+that revision from Hugging Face for every Hebrew book folder in the repository and under .tanakh/alternatives/<kind>/ (kept
+in --cache), and writes
 {BOOK: {"c:v": [key, ...]}}: a verse's clauses in the layout's order (seg), each as its span `first-last` (the clause key and
 the last word over all its segments), a clause met again in the verse as `/2`, `/3` (its next segment). Needs pyarrow.
 The layout's clauses and word ids are MACULA Hebrew's (CC BY 4.0)."""
@@ -51,7 +52,13 @@ def main(argv):
     root, dest = argv[0], argv[1]
     cache = argv[argv.index("--cache") + 1] if "--cache" in argv else os.path.join(root, ".layout-cache")
     pin = json.load(open(os.path.join(root, ".tanakh", "layout.json"), encoding="utf-8"))["hebrew-clause-layout"]
-    books = sorted(d for d in os.listdir(root) if d in HEBREW and os.path.isdir(os.path.join(root, d)))
+    books = {d for d in os.listdir(root) if d in HEBREW and os.path.isdir(os.path.join(root, d))}
+    alts = os.path.join(root, ".tanakh", "alternatives")   # the alternative drafts' books (FORMAT.md section 9)
+    if os.path.isdir(alts):
+        for kind in os.listdir(alts):
+            if os.path.isdir(os.path.join(alts, kind)):
+                books |= {d for d in os.listdir(os.path.join(alts, kind)) if d in HEBREW and os.path.isdir(os.path.join(alts, kind, d))}
+    books = sorted(books)
     folder = os.path.join(os.path.expanduser(cache), pin["revision"])
     os.makedirs(folder, exist_ok=True)
     out = {}

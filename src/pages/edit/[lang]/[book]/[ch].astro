@@ -20,6 +20,7 @@ const data = {
   version: d.version, main: d.main, approved: d.approved, hebrew: heb,
   verses: d.verses, title: d.title, headings: d.headings, notes: d.notes, poetry: d.poetry,
   renderings: d.renderings, glosses: d.glosses, langName: LANG_NAMES[lang] || lang,
+  alternatives: d.alternatives,
 };
 ---
 <Base title={`${book} ${ch} (${LANG_NAMES[lang] || lang})`}>
@@ -37,6 +38,9 @@ const data = {
       <li>Each verse's words are linked to the Hebrew. When you change a verse's text, its links are carried over to your new
         wording on save (words you replaced lose theirs) and the verse shows <b>check links</b> until someone checks them.</li>
       <li>Notes from the drafters stand under their verse: T text-critical, E exegetical, H cross-reference, N to the reviewers.</li>
+      <li>Where the chapter has <b>other drafts</b> (made by other methods), each one's words for the same Hebrew clause stand under the
+        box (<b>use</b> puts them in the box). Words of the box that no other draft has in this clause are shaded strongly, words
+        only some have lightly: places to look at first, not errors.</li>
     </ul>
   </details>
   <div id="editor" class="editor"></div>

@@ -122,6 +122,9 @@ exactly where the word's rendering begins: 97.6% of the 24,329 lines), `in` or `
   one unit.
 - `.notes`: anchors inside the verse (0 .. token count).
 - No secrets, no files outside the forms above (a PR that touches other files is merged on github.com only).
+- Alternative drafts (section 9) get every check above, and: `alternative:` equal to the folder's kind, `built:` a date,
+  `# units: authored`, all four files present, a README line per kind, no other file under `.tanakh/alternatives/`. A pull
+  request that touches them gets a notice (only the publisher writes them). `layout_keys.py` takes their books too.
 
 ## 7. Derived formats
 
@@ -149,6 +152,45 @@ MACULA's (CC BY 4.0) through the spine.
 - Keys: the spine's lexemes with their prefix (`hbo:`, `grc:`), content and function words (the `.align` main and fn links).
 - Forms: lower-cased, as the drafts write them; a rendering of several words is one form; the commonest first; at most 8 per
   lexeme; forms seen once are kept (the editor trims).
-- Counted: the language's drafted chapters (never `_eval/` or anything that has not passed the publishing screen).
+- Counted: the language's drafted chapters, the main drafts only (never `_eval/`, never `.tanakh/alternatives/`, nothing that
+  has not passed the publishing screen).
 - The editor finds a word's lexeme in compact-alignments' source index (`_index/<BOOK>_lexemes.json` beside `_keys.json`,
   `_fn.json` beside `_fn_keys.json`). A repo without the file shows the draft's own renderings and MACULA's English only.
+
+## 9. Alternative drafts: the same chapter by other methods (`.tanakh/alternatives/`, decided 2026-11-09)
+
+Besides the main draft that reviewers edit, the drafting side (make-tanakh-grammar) publishes drafts of the same chapter made
+by other methods (today `nllb`, a translation model fine-tuned on the team's text, and `shape`, every word taken from the
+team's usage). They are weaker overall but each is the best for some clauses; the editor shows them under each clause, read
+only, and shades the main text's words by how many of them have the word.
+
+```
+.tanakh/alternatives/README.md                         one line per kind and book range
+.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.md     the alternative's text
+.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.units  its clause units
+.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.notes  its notes (may hold only the header)
+.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.align  its alignment to the Hebrew (profile a)
+```
+
+- `<kind>` matches `[a-z0-9-]+`. The four files follow sections 1 to 4 unchanged (same tokeniser, the text hash in every
+  sidecar header, the clause keys of the pinned layout), with `# units: authored`. The front matter has two more keys:
+  `alternative: "<kind>"` (the folder's name) and `built: "YYYY-MM-DD"`; `status.maturity` is the language's "Machine draft",
+  `status.translation` describes the generator.
+- README lines: ``- `<kind>` (<BOOK> <chapters>): <generator, model>; built <date>``.
+- Never edited. Only the publisher (`.tanakh/publisher.json`) writes them; a rebuild replaces a kind's chapter as a whole. A
+  chapter may lack any alternative, a kind may lack some chapters. A clause an alternative has no words for is `key:=` in its
+  `.units`, explained by an `N` note.
+- **No agreement file.** The editor computes the agreement from the current files every time, also after edits (a stored copy
+  would go stale with any edit to the chapter, and a rule change would mean republishing every repository):
+  1. Tokens: the standard tokeniser (section 1) on the verse text, each token lower-cased and NFC.
+  2. A unit's clause: its key without a `/n` segment and a `.n` split. A main unit takes in the keys written `=` right after it
+     in the same verse (its joined clauses).
+  3. An alternative's words for a clause: the tokens of all its units in the same verse whose key reduces to that clause, by
+     their ranges. If all of them are `=`, or the clause is missing, that alternative has nothing for it and does not count.
+     For a main unit of several clauses, the alternative's words for any of them.
+  4. Per token of a main unit: support = the alternatives (of those with words for the clause) whose words contain it;
+     available = how many have words for the clause.
+  5. Shading: available 0, none; support 0, strong (no other draft says this); between, light; support = available, none.
+  Membership is exact after step 1: another wording of the same meaning is no support. Repeated tokens are checked each on
+  its own (a set, not counts). Nothing crosses a verse. After an edit the shading compares the reviewer's wording.
+
