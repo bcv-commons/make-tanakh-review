@@ -59,7 +59,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `src/lib/align.js` | projection of links and note anchors across a text edit (PLAN.md 16.2, first step) |
 | `src/lib/poetry.js` | poetry lines (`.tanakh/poetry/`) placed through `.units` and `.align` (browser and server) |
 | `src/lib/alternatives.js` | the other drafts of a chapter (`.tanakh/alternatives/`, FORMAT.md section 9): their words under each clause, and the agreement shading computed from the current text |
-| `src/lib/renderings.js` | the glosses under the Hebrew words: the draft's own rendering (`.align`) and the language's commonest renderings (`.tanakh/glosses.json`, FORMAT.md section 8) |
+| `src/lib/renderings.js` | the glosses under the Hebrew words: the draft's own rendering (`.align`) and the language's commonest renderings (`.tanakh/glosses.json`, FORMAT.md section 8; else lexeme-alignments' `top.json` at the revision pinned in `config.js`, cached in `$MTR_DATA/lexeme-glosses/`) |
 | `tools/fetch_index.mjs` | compact-alignments' source index into `$MTR_DATA/index` (the `.align` ordinals and their lexemes, for the poetry lines and the glosses) |
 | `template/.github/` | the language repos' CI: `workflows/validate.yml` runs `check/validate.mjs` (FORMAT.md section 6) |
 | `src/lib/units.js` | the clause-unit model: `#` / `%`, labels, changed verses (browser and server) |

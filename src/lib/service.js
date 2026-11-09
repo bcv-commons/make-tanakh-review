@@ -58,7 +58,8 @@ const unitsOf = (ch) => (ch ? ch.list : []);
 
 // What the editor shows: the user's branch while they have a proposal open, else main; main and approved for comparison.
 // `index`: the book's source index (config.sourceIndex) for the poetry lines, or null (then only clause-keyed lines show).
-export async function load(store, login, file, { index = null } = {}) {
+// `glossFallback`: () => the language's lexeme-glosses table (config.lexemeGlosses), used where the repo has no glosses file.
+export async function load(store, login, file, { index = null, glossFallback = null } = {}) {
   const pr = login ? await openPR(store, login) : null;
   const branch = pr ? pr.branch : MAIN;
   const cur = await model(store, branch, file);
@@ -66,7 +67,7 @@ export async function load(store, login, file, { index = null } = {}) {
   return { branch, pr, units: cur.list, version: cur.versions, main: unitsOf(await model(store, MAIN, file)),
     approved: unitsOf(await model(store, APPROVED, file)), verses: verseInfo(cur), ...display(cur), poetry: await poetry(store, branch, file, cur, index),
     renderings: cur.align && !cur.stale.align ? renderings(index, { book: file.slice(0, 3), verses: cur.verses, align: cur.align.rows }) : {},
-    glosses: chapterGlosses(await glossTable(store), wordLexemes(index, file.slice(0, 3), cur.verses.map((v) => v.ref))),
+    ...(await glosses(store, index, file, cur, glossFallback)),
     alternatives: await alternatives(store, file) };
 }
 
@@ -87,6 +88,17 @@ async function alternatives(store, file) {
     out.push({ kind, about: about[kind] || kind, built: built ? built[1] : null, verses: altUnits(ch.verses, ch.units.verses) });
   }
   return out;
+}
+
+// The chapter's glosses (FORMAT.md section 8): the repo's own `.tanakh/glosses.json` (counted from its drafts), else the
+// fallback (lexeme-aligner's top.json over the language's Bible editions). { glosses, glossSource }
+async function glosses(store, index, file, cur, fallback) {
+  let table = await glossTable(store), source = table ? "drafts" : null;
+  if (!table && fallback) { try { table = await fallback(); } catch { table = null; } if (table) source = "editions"; }
+  if (!table) return { glosses: {}, glossSource: null };
+  const sources = source === "editions" && Array.isArray(table.sources) ? table.sources : null;
+  return { glosses: chapterGlosses(table, wordLexemes(index, file.slice(0, 3), cur.verses.map((v) => v.ref))),
+    glossSource: source === "drafts" ? "this language's drafts" : `lexeme-alignments${sources ? ` (${sources.join(", ")})` : ""}` };
 }
 
 // The language's commonest renderings per Hebrew lexeme: `.tanakh/glosses.json` on main (FORMAT.md section 8), published with the

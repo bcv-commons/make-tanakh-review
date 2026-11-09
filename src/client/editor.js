@@ -76,10 +76,10 @@ function renderBar() {
 }
 
 // Under a Hebrew word: in the translation, the draft's own rendering (its .align links, as the page loaded it) or, where it has
-// none or the verse was changed since, the word's commonest renderings (tools/build_glosses.py) in italics; or MACULA's English.
+// none or the verse was changed since, the word's commonest renderings (the repo's glosses file, else lexeme-alignments) in italics; or MACULA's English.
 function wordGloss(w, live) {
   const r = live && (S.renderings || {})[w.id], usual = (S.glossTable || {})[w.id];
-  const tip = [r && `this draft: ${r}`, usual && `usually: ${usual.map(([f, c]) => `${f} ${c}`).join(" · ")}`].filter(Boolean).join("\n");
+  const tip = [r && `this draft: ${r}`, usual && `usually${S.glossSource ? ` (${S.glossSource})` : ""}: ${usual.map(([f, c]) => `${f} ${c}`).join(" · ")}`].filter(Boolean).join("\n");
   if (S.glosses === "en") return { text: w.gloss, tip: w.gloss, cls: "g" };
   if (S.glosses === "0") return { text: null, tip: tip || null, cls: "g" };
   return r ? { text: r, tip, cls: "g" } : { text: usual ? usual[0][0] : null, tip: tip || null, cls: "g c" };

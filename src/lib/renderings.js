@@ -46,8 +46,10 @@ export function renderings(index, ch) {
 // The lexeme of each word of the given verses, from the source index's lexeme lists (compact-alignments `_index/<BOOK>_lexemes
 // .json` beside `_keys.json`, `_fn.json` beside `_fn_keys.json`; published without the `hbo:`/`grc:` prefix, added here from
 // the MACULA book number). A word's content morpheme's lexeme wins over its function morphemes'. { "<word id>": "hbo:0430" }
+// The words that are function morphemes only (no content morpheme) are listed in the result's non-enumerable `fn` (a Set).
 export function wordLexemes(index, book, refs) {
-  const out = {};
+  const out = {}, fnOnly = new Set(), hasContent = new Set();
+  Object.defineProperty(out, "fn", { value: fnOnly });
   if (!index || !index.lexemes) return out;
   for (const ref of refs) {
     const k = `${book} ${ref}`;
@@ -58,6 +60,8 @@ export function wordLexemes(index, book, refs) {
         for (const id of key.split("+").filter(Boolean)) {
           const w = id.slice(0, 11), pre = Number(id.slice(0, 2)) <= 39 ? "hbo:" : "grc:";
           if (content || !out[w]) out[w] = pre + lex[o];
+          if (content) fnOnly.delete(w); else if (out[w] === pre + lex[o] && !hasContent.has(w)) fnOnly.add(w);
+          if (content) hasContent.add(w);
         }
       });
     }
@@ -73,9 +77,18 @@ export function trimForms(forms, n = 4) {
   const kept = forms.filter(([, c]) => c >= 2 && c / total >= 0.05);
   return (kept.length ? kept : forms).slice(0, kept.length ? n : 1);
 }
+// From lexeme-aligner's table (lexeme-glosses/1, which has a `function` list), a function word (a word that is only a function
+// morpheme in the source index) is given only when one form holds at least half of its count: their forms are less reliable, a
+// word with no counterpart, such as אֵת, being linked to a neighbour. (Its `function` list names content words too, 2026-11-09.)
 export function chapterGlosses(table, lexemes, n = 4) {
   const out = {};
   if (!table || !table.lexemes) return out;
-  for (const [w, lex] of Object.entries(lexemes)) { const f = table.lexemes[lex]; if (f && f.length) out[w] = trimForms(f, n); }
+  const strict = Array.isArray(table.function), fn = lexemes.fn || new Set();
+  for (const [w, lex] of Object.entries(lexemes)) {
+    const f = table.lexemes[lex];
+    if (!f || !f.length) continue;
+    if (strict && fn.has(w) && f[0][1] * 2 < f.reduce((a, [, c]) => a + c, 0)) continue;
+    out[w] = trimForms(f, n);
+  }
   return out;
 }

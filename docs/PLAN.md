@@ -346,6 +346,13 @@ In detail (2026-11-03, as the code expects it):
   The check (validate.mjs) gives them every chapter check plus their own keys; `layout_keys.py` takes their books. Not
   done: the per-token hover (the box lies over the shading); their offer of `main_text: <sha256>` in the front matter is
   left open (not needed while the shading compares the current text).
+- **2026-11-09: lexeme-aligner's `top.json` is live** for 1,807 languages and is the editor's fallback glosses where a repo has
+  no `.tanakh/glosses.json` (`config.lexemeGlosses`, pinned at commit 989959e3 of bcv-commons/lexeme-alignments; the hover
+  says which source). Danish: one edition (`dan_det`, older spelling: fader, Ægypten, Josua), 9,122 Hebrew lexemes. Against
+  the stand-in from our drafts: the same top form for 57 % of content-word occurrences (75 % have our top form among theirs;
+  most differences are inflection order and spelling), 79 % for function words. Their `function` list names content words
+  too (עֶבֶד, Moses, the divine name), so the editor judges by the word's own role in the source index: a word that is only a
+  function morpheme is shown only when one form holds half its count (drops אֵת, אֲשֶׁר, לְ; JOS 1: 274 of 320 words glossed).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

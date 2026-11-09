@@ -51,6 +51,15 @@ test("each word's lexeme (content before function), and its commonest renderings
   assert.deepEqual(chapterGlosses(null, lex), {});
   assert.deepEqual(trimForms([["josva", 174], ["josvas", 3], ["han", 2], ["føre krig", 1]]), [["josva", 174]]);   // noise out
   assert.deepEqual(trimForms([["nun", 1], ["nuns", 1]]), [["nun", 1]]);                                        // all rare: one
+  // lexeme-glosses/1 (it has a `function` list): a word that is only a function morpheme, only when one form holds half its count
+  assert.deepEqual([...lex.fn].sort(), ["06001001002", "06001002002"]);
+  const top = { format: "lexeme-glosses/1", function: ["hbo:4194"], lexemes: { "hbo:0310": [["efter", 266], ["til", 122]],
+    "hbo:2050b": [["og", 300], ["så", 200], ["men", 150]], "hbo:4194": [["død", 45], ["døden", 43]] } };
+  const t = chapterGlosses(top, lex);
+  assert.deepEqual(t["06001001002"], [["efter", 266], ["til", 122]]);
+  assert.equal(t["06001002002"], undefined);                                                                     // og 300 of 650
+  assert.deepEqual(t["06001001003"], [["død", 45], ["døden", 43]]);                                             // a content word: listed or not
+  assert.ok(chapterGlosses({ lexemes: top.lexemes }, lex)["06001002002"]);                                       // our own table: as it is
 });
 
 const STORES = {
@@ -77,5 +86,19 @@ for (const [kind, make] of Object.entries(STORES)) {
     assert.deepEqual(d.glosses["06001001002"], [["efter", 194]]);
     assert.deepEqual(d.glosses["06001002001"], [["tjenere", 158], ["tjener", 153]]);
     assert.equal(d.renderings["06001002001"], "tjener");
+    assert.equal(d.glossSource, "this language's drafts");
+  });
+
+  test(`${kind}: without the repo's file, the fallback table (lexeme-alignments), and the repo's file wins`, async () => {
+    const st = make();
+    await st().writeFiles("main", files("JOS/JOS_001", chapterFiles()), { message: "seed" });
+    const top = { format: "lexeme-glosses/1", sources: ["dan_det"], function: [], lexemes: { "hbo:5650": [["træl", 138]] } };
+    const d = await S.load(st(), null, "JOS/JOS_001.md", { index, glossFallback: async () => top });
+    assert.deepEqual(d.glosses["06001002001"], [["træl", 138]]);
+    assert.equal(d.glossSource, "lexeme-alignments (dan_det)");
+    assert.deepEqual((await S.load(st(), null, "JOS/JOS_001.md", { index, glossFallback: async () => { throw new Error("offline"); } })).glosses, {});
+    await st().writeFiles("main", { ".tanakh/glosses.json": JSON.stringify(TABLE) }, { message: "glosses" });
+    const e = await S.load(st(), null, "JOS/JOS_001.md", { index, glossFallback: async () => top });
+    assert.deepEqual(e.glosses["06001002001"], [["tjenere", 158], ["tjener", 153]]);
   });
 }

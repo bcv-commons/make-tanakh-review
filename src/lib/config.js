@@ -97,3 +97,33 @@ export function sourceIndex(book) {
   }
   return indexes.get(book);
 }
+
+// The fallback glosses where a language repo has no `.tanakh/glosses.json` (FORMAT.md section 8): lexeme-aligner's commonest
+// renderings per lexeme over all the language's Bible editions (bcv-commons/lexeme-alignments `iso=<iso>/top.json`, format
+// lexeme-glosses/1, counts only, CC0), read at a pinned revision of the dataset (the files are rebuilt with each chain run).
+// Kept in memory, and under DATA/lexeme-glosses/<revision>/ where that can be written; a missing language is remembered,
+// a network failure is retried after ten minutes.
+export const LEXEME_GLOSSES = { dataset: "bcv-commons/lexeme-alignments", revision: "989959e3e09c860cda1434d34d7b8fc36e9c477b" };
+const tops = new Map();
+export async function lexemeGlosses(iso) {
+  if (!/^[a-z]{3}$/.test(iso || "")) return null;
+  const hit = tops.get(iso);
+  if (hit && (hit.table || hit.missing || Date.now() - hit.at < 600e3)) return hit.table;
+  const file = path.join(DATA, "lexeme-glosses", LEXEME_GLOSSES.revision, `${iso}.json`);
+  let table = null, missing = false;
+  try { table = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* not kept yet */ }
+  if (!table) {
+    try {
+      const r = await http(`https://huggingface.co/datasets/${LEXEME_GLOSSES.dataset}/resolve/${LEXEME_GLOSSES.revision}/iso=${iso}/top.json`);
+      if (r.status === 404) missing = true;
+      else if (r.ok) {
+        const text = await r.text();
+        table = JSON.parse(text);
+        try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); } catch { /* read-only: memory only */ }
+      }
+    } catch { /* offline: no fallback for now */ }
+  }
+  if (table && table.format !== "lexeme-glosses/1") table = null;
+  tops.set(iso, { table, missing, at: Date.now() });
+  return table;
+}

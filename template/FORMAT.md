@@ -155,7 +155,9 @@ MACULA's (CC BY 4.0) through the spine.
 - Counted: the language's drafted chapters, the main drafts only (never `_eval/`, never `.tanakh/alternatives/`, nothing that
   has not passed the publishing screen).
 - The editor finds a word's lexeme in compact-alignments' source index (`_index/<BOOK>_lexemes.json` beside `_keys.json`,
-  `_fn.json` beside `_fn_keys.json`). A repo without the file shows the draft's own renderings and MACULA's English only.
+  `_fn.json` beside `_fn_keys.json`). A repo without the file falls back to lexeme-aligner's counts over the language's Bible
+  editions (bcv-commons/lexeme-alignments `iso=<iso>/top.json`, format `lexeme-glosses/1`, at a revision pinned in the editor);
+  from those, a word that is only a function morpheme is shown only when one form holds half its count.
 
 ## 9. Alternative drafts: the same chapter by other methods (`.tanakh/alternatives/`, decided 2026-11-09)
 
