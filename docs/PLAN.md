@@ -353,6 +353,10 @@ In detail (2026-11-03, as the code expects it):
   most differences are inflection order and spelling), 79 % for function words. Their `function` list names content words
   too (עֶבֶד, Moses, the divine name), so the editor judges by the word's own role in the source index: a word that is only a
   function morpheme is shown only when one form holds half its count (drops אֵת, אֲשֶׁר, לְ; JOS 1: 274 of 320 words glossed).
+  lexeme-aligner's answer: `function` listed a lexeme if any counted occurrence was a function token (Psalm headings are
+  forced non-content in their chain); the next build lists it only when at least half are (Danish 791 -> 693). They will
+  send the commit; the editor needs no change for it, only the pin in `config.js` moved. Verb + particle splits ("op" for
+  "drog op") are the aligner linking one word only; they are looking at joining an adjacent particle in the span extension.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
