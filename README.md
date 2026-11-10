@@ -49,7 +49,8 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | | |
 |---|---|
 | `docs/PLAN.md` | the plan and its log |
-| `tools/prepare_chapter.py` | draft + alignment + Hebrew clause layout -> clause units (`.local/seed`) and the Hebrew side (`.local/hebrew`) |
+| `tools/prepare_chapter.py` | draft + alignment + Hebrew clause layout -> clause units (`.local/seed`) |
+| `tools/build_hebrew.py` | the reference build of the Hebrew side (layout + spine, glosses included) -> `.local/hebrew`, the editor's copy without the network; the published one is bcv-query's `bcv-commons/tanakh-hebrew-clauses` |
 | `tools/build_links.py`, `add_links.sh` | the review links: alignment text, sidecars from two runs, committed to main |
 | `tools/init_local.sh` | the local language repo (README, LICENSE CC0, CONTRIBUTING, chapters on `main` and `approved`) and roles |
 | `template/FORMAT.md` | the chapter format of the language repos: `.md` text plus `.units`, `.notes`, `.align` sidecars |
@@ -69,7 +70,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `tools/github_live_test.mjs` | the live test: `setup <owner>/<repo>` makes a test App (manifest, three clicks), `run` runs the flows against a throw-away repo, `dev` runs the app itself against it (port 4398) |
 | `src/lib/service.js` | the flows: load, save, proposal, merge, bring in main, close, reviewer request, approve |
 | `src/lib/session.js`, `oauth.js` | the sealed session cookie, the CC0 agreement; GitHub sign-in (local: sign-in by name) |
-| `src/lib/http.js`, `config.js` | route helpers; settings (`MTR_DATA`, `MTR_GITHUB_*`), the language list, the store per user |
+| `src/lib/http.js`, `config.js` | route helpers; settings (`MTR_DATA`, `MTR_GITHUB_*`), the language list, the store per user; the Hebrew side of a chapter (`bcv-commons/tanakh-hebrew-clauses` and MACULA Hebrew's glosses, both pinned, kept in `$MTR_DATA/tanakh-hebrew/` and `macula-glosses/`) |
 | `src/pages/` | home, editor (`edit/[lang]/[book]/[ch]`), review (`review/[lang]`), `api/*` |
 | `src/client/editor.js` | the editor in the browser |
 

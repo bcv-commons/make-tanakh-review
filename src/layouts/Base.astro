@@ -37,8 +37,8 @@ const msg = Astro.url.searchParams.get("msg");
     {msg && <p class="msg">{msg}</p>}
     <main><slot /></main>
     <footer>
-      Drafts and edits: CC0 1.0. Hebrew text and glosses: MACULA Hebrew (WLC), CC BY 4.0. Clause units: bcv-commons
-      hebrew-clause-layout (from MACULA Hebrew), CC BY 4.0.{!github && " Local test: sign-in by name only, no GitHub."}
+      Drafts and edits: CC0 1.0. Hebrew text and glosses: MACULA Hebrew (WLC), Clear Bible / Biblica, CC BY 4.0. Clause units:
+      bcv-commons hebrew-clause-layout (from MACULA Hebrew), CC BY 4.0, through bcv-commons tanakh-hebrew-clauses.{!github && " Local test: sign-in by name only, no GitHub."}
     </footer>
   </body>
 </html>

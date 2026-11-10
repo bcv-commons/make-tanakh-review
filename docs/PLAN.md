@@ -88,7 +88,7 @@ A chapter file, one clause unit per line, tab-separated, diff-friendly (a pull r
 - Units are in the target's reading order within the verse; the verse text is the units joined by a space.
 - Only keys go in the repo, never Hebrew text: the Hebrew is shown by the editor from the layout (credited) and keys are identifiers.
 
-### 4.2 Read-only side data (prepared once, `.local/hebrew/<BOOK>/<CCC>.json`)
+### 4.2 Read-only side data (the Hebrew side: `bcv-commons/tanakh-hebrew-clauses`, see the log 2026-11-10)
 
 Per verse the Hebrew clauses in order: key, kind, rule, and per word (morphemes grouped by word): surface, English gloss
 (MACULA, CC BY 4.0), whether it is a content word, and whether the seeded draft linked it to a target word (the review flag).
@@ -392,6 +392,15 @@ In detail (2026-11-03, as the code expects it):
   policy would show as disabled in the repo's settings). The seed commits are unsigned, so they came by `git push`, not
   through the API; the open question is that push's credential. The template's workflow gained `workflow_dispatch` (a run
   by hand gives the check on a branch). The editor needs the App installed on global-tanakh (it is on `larsgson` only).
+- **2026-11-10: the Hebrew side for every chapter and every language.** The prepared `.local/hebrew` held GEN and JOS only and
+  carried the Danish draft's `linked` flag (a fallback when a chapter had no `.align`). Now: `tools/build_hebrew.py` (the
+  reference: pinned layout columns chapter, verse, seg, clause_key, kind, rule, words, never its UHB text or hierarchy; the
+  pinned spine's surface, gloss, is_content) -> 929 chapters, identical to the old JOS 1 but for the flag. bcv-query publishes
+  it as `bcv-commons/tanakh-hebrew-clauses` (schema 1 in build.json, revision 67da6e06), without the English glosses (they
+  publish no English values). `config.hebrew` reads the dataset at the pinned revision and joins each word's gloss from
+  MACULA Hebrew's own lowfat files (Clear-Bible/macula-hebrew at 47db250b, the `gloss` of its morphemes, the same values as
+  the spine's): checked equal to the reference build on seven chapters (RUT 1, JOS 1, GEN 1, PSA 119, HOS 1, NEH 7, MAL 3).
+  Both kept in memory and under `$MTR_DATA`; offline the local build. The editor's unrendered-word flag comes only from `.align`.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

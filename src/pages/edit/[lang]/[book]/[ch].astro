@@ -14,7 +14,7 @@ const d = file ? await load(store, user?.login, file, { index: sourceIndex(book)
 if (!d) return new Response("No such chapter", { status: 404 });
 rememberLanguage(lang, d.language);
 Astro.cookies.set("mtr_last", `${lang}/${book}/${Number(ch)}`, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
-const heb = hebrew(book, Number(ch)).verses;
+const heb = (await hebrew(book, Number(ch))).verses;
 const data = {
   lang, file, book, chapter: Number(ch), user: user && { login: user.login, agreed: !!user.agreed, ...(await roles(store, user.login)) },
   branch: d.branch, pr: d.pr && { number: d.pr.number, status: d.pr.status }, units: d.units,

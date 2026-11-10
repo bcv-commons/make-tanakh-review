@@ -85,10 +85,72 @@ export async function storeFor(lang, user = null) {
   return stores.get(lang);
 }
 
-export function hebrew(book, chapter) {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(DATA, "hebrew", book, `${String(chapter).padStart(3, "0")}.json`), "utf8"));
-  } catch { return { book, chapter, verses: {} }; }
+// The Hebrew side of a chapter (PLAN.md 4.2), the same for every language: bcv-commons/tanakh-hebrew-clauses (published by
+// bcv-query, schema 1: per verse the layout's clause segments, each word's MACULA id, surface and content flag; CC BY 4.0) at a
+// pinned revision, with each word's English gloss joined from MACULA Hebrew itself (the `gloss` of its morphemes, at a pinned
+// commit of Clear-Bible/macula-hebrew; CC BY 4.0). Both are kept in memory and under DATA/ where that can be written; a failure
+// is retried after ten minutes. Without the network: DATA/hebrew/<BOOK>/<CCC>.json (tools/build_hebrew.py, glosses included).
+export const HEBREW = { dataset: "bcv-commons/tanakh-hebrew-clauses", revision: "67da6e0661e67b4e00dd7665a66a021bab856240" };
+export const MACULA_HEBREW = { repo: "Clear-Bible/macula-hebrew", commit: "47db250bd55d0d8577f2a94fba114ef16c35b23c" };
+const ccc = (chapter) => String(chapter).padStart(3, "0");
+// MACULA's file of a chapter: WLC/lowfat/<nn>-<Book>-<ccc>-lowfat.xml (Hosea's book part is written HOS there)
+export const maculaFile = (book, chapter) => {
+  const i = BOOK_ORDER.indexOf(book);
+  return i < 0 ? null : `WLC/lowfat/${String(i + 1).padStart(2, "0")}-${book === "HOS" ? "HOS" : book.toLowerCase().replace(/[a-z]/, (x) => x.toUpperCase())}-${ccc(chapter)}-lowfat.xml`;
+};
+// { morpheme id: gloss } from a MACULA lowfat file: every <w xml:id="o<id>" ... gloss="..."> (attributes in any order)
+const unescape = (s) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+export function maculaGlosses(xml) {
+  const out = {};
+  for (const m of xml.matchAll(/<w\s[^>]*>/g)) {
+    const id = /xml:id="o(\d{12})"/.exec(m[0]), g = /\sgloss="([^"]*)"/.exec(m[0]);
+    if (id && g) out[id[1]] = unescape(g[1]);
+  }
+  return out;
+}
+
+const cached = new Map();
+// a file fetched once and kept: memory, then DATA/<dir>/<name>, then the URL; `parse` turns the text into the value
+async function keep(dir, name, url, parse) {
+  const id = `${dir}/${name}`, hit = cached.get(id);
+  if (hit && (hit.value || Date.now() - hit.at < 600e3)) return hit.value;
+  const file = path.join(DATA, dir, name);
+  let value = null;
+  try { value = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* not kept yet */ }
+  if (!value) {
+    try {
+      const r = await http(url);
+      if (r.ok) {
+        value = parse(await r.text());
+        try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(value)); } catch { /* read-only: memory only */ }
+      }
+    } catch { /* offline */ }
+  }
+  cached.set(id, { value, at: Date.now() });
+  return value;
+}
+
+export async function hebrew(book, chapter) {
+  const none = { book, chapter, verses: {} };
+  if (!BOOK_ORDER.includes(book) || !Number.isInteger(chapter) || chapter < 1 || chapter > 150) return none;
+  const H = HEBREW, M = MACULA_HEBREW;
+  const [ch, glosses] = await Promise.all([
+    keep(`tanakh-hebrew/${H.revision}`, `${book}/${ccc(chapter)}.json`,
+      `https://huggingface.co/datasets/${H.dataset}/resolve/${H.revision}/data/${book}/${ccc(chapter)}.json`, JSON.parse),
+    keep(`macula-glosses/${M.commit}`, `${book}_${ccc(chapter)}.json`,
+      `https://raw.githubusercontent.com/${M.repo}/${M.commit}/${maculaFile(book, chapter)}`, maculaGlosses),
+  ]);
+  if (!ch || typeof ch.verses !== "object") {
+    try { return JSON.parse(fs.readFileSync(path.join(DATA, "hebrew", book, `${ccc(chapter)}.json`), "utf8")); } catch { return none; }
+  }
+  // a word's gloss: its morphemes' glosses (the word id and one part digit, 1, 2, ...), the empty ones skipped
+  const out = structuredClone(ch);
+  for (const clauses of Object.values(out.verses)) for (const c of clauses) for (const w of c.words || []) {
+    const parts = [];
+    for (let p = 1; p <= 9 && glosses && glosses[`${w.id}${p}`] !== undefined; p++) if (glosses[`${w.id}${p}`]) parts.push(glosses[`${w.id}${p}`]);
+    w.gloss = parts.join(" ");
+  }
+  return out;
 }
 
 // compact-alignments' source index of a book ({ keys, fn }: "BOOK c:v" -> [MACULA key, ...]; the .align ordinals count these
