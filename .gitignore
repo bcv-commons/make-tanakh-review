@@ -4,4 +4,6 @@ dist/
 .astro/
 .local/
 .env
+.env.*
+!.env.example
 internal-docs/
