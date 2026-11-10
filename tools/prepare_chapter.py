@@ -2,7 +2,7 @@
 """Seed make-tanakh-review with drafted chapters (PLAN.md sections 4-5): per chapter
 
   <out>/seed/<BOOK>/<BOOK>_<CCC>.tsv      the draft cut into clause units along the Hebrew clause layout (CC0 text + clause keys)
-  <out>/hebrew/<BOOK>/<CCC>.json          the Hebrew clauses per verse: words (surface, gloss, content?, linked by the draft?)
+  (the Hebrew side of the editor is tools/build_hebrew.py: the same for every language, nothing from a draft)
 
 The cuts follow the draft's own alignment (<code>NNN.align): each linked target token votes for the clause of its Hebrew word; a
 dynamic programme cuts the verse's tokens into one contiguous group per clause, in order, with the fewest votes outside their
@@ -136,7 +136,7 @@ def main(a):
                 continue
             f = line.rstrip("\n").split("\t"); al[int(f[0])] = FA.parse(f[1])
         L = layout(a.book, ch); S = spine(a.book, ch)
-        rows, heb = [], {}
+        rows = []
         for (c, v), text in sorted(V.items()):
             if c != ch:
                 continue
@@ -148,32 +148,12 @@ def main(a):
             key_clause = {k: i for i, cl in enumerate(clauses) for k in cl["words"]}
             for keys, t in units_of(text, clauses, links, key_clause, st):
                 rows.append(f"{c}:{v}\t{keys}\t{t}")
-            linked = {k for k, ps in links.items() if ps}
-            hv = []
-            for cl in clauses:
-                words = collections.OrderedDict()
-                for k in cl["words"]:
-                    if k not in S:
-                        continue
-                    _, surf, gloss, content = S[k]
-                    w = words.setdefault(k[:11], {"surface": "", "gloss": [], "content": False, "linked": False})
-                    w["surface"] += surf
-                    if gloss:
-                        w["gloss"].append(gloss)
-                    if content:
-                        w["content"] = True; w["linked"] = w["linked"] or k in linked
-                hv.append({"key": cl["clause_key"], "kind": cl["kind"], "rule": cl["rule"],
-                           "words": [{"id": i, "surface": w["surface"], "gloss": " ".join(w["gloss"]),
-                                      "content": w["content"], "linked": w["linked"]} for i, w in words.items()]})
-            heb[v] = hv
         for sub, name, body in (("seed", f"{a.book}_{ch:03d}.tsv",
                                  f"# {a.book} {ch} · make-tanakh-review clause units · CC0 · columns: verse, Hebrew clauses, text\n"
-                                 + "\n".join(rows) + "\n"),
-                                ("hebrew", f"{ch:03d}.json", json.dumps({"book": a.book, "chapter": ch, "verses": heb},
-                                                                        ensure_ascii=False))):
+                                 + "\n".join(rows) + "\n"),):
             d = os.path.join(a.out, sub, a.book); os.makedirs(d, exist_ok=True)
             open(os.path.join(d, name), "w", encoding="utf-8").write(body)
-        print(f"{a.book} {ch}: {len(heb)} verses, {len(rows)} units")
+        print(f"{a.book} {ch}: {len(rows)} units")
     print(dict(st))
 
 

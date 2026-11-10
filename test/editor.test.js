@@ -17,7 +17,7 @@ const units = [
   { ref: "1:1", bases: ["B", "C"], text: "sagde HERREN til Josva:" },
   { ref: "1:2", bases: ["D"], text: "Min tjener er død." },
 ];
-const hebrew = { 1: [{ key: "A", kind: "VC", rule: "V", words: [{ id: "a", surface: "וַיְהִי", gloss: "and.it.was", content: true, linked: false }] },
+const hebrew = { 1: [{ key: "A", kind: "VC", rule: "V", words: [{ id: "a", surface: "וַיְהִי", gloss: "and.it.was", content: true }] },
   { key: "B", kind: "VC", rule: "V", words: [] }, { key: "C", kind: "VC", rule: "V", words: [] }], 2: [{ key: "D", kind: "VC", rule: "V", words: [] }] };
 start({ lang: "dan", file: "JOS/JOS_001.md", user: { login: "ann", agreed: true }, branch: "main", pr: null,
   units, version: "v1", main: units, approved: units, hebrew });
@@ -25,10 +25,10 @@ start({ lang: "dan", file: "JOS/JOS_001.md", user: { login: "ann", agreed: true 
 const boxes = () => [...document.querySelectorAll("textarea.u")];
 const type = (i, value) => { const t = boxes()[i]; t.value = value; t.dispatchEvent(new window.Event("input")); };
 
-test("renders a row per clause unit, Hebrew flags included", () => {
+test("renders a row per clause unit; no unrendered-word flag without the chapter's links", () => {
   assert.equal(boxes().length, 3);
   assert.equal(document.querySelectorAll(".verse").length, 2);
-  assert.equal(document.querySelectorAll(".w.unlinked").length, 1);
+  assert.equal(document.querySelectorAll(".w.unlinked").length, 0);   // the flags come only from the chapter's .align
 });
 
 test("# splits, % joins back, a cross-verse join is refused", () => {

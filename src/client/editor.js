@@ -113,7 +113,7 @@ function hebrewCell(verse, u, seen) {
       `… continues the clause “${first.words.slice(0, 3).map((w) => w.surface).join(" ")}”`));
     cell.append(el("div", { class: "clause", title: `${c.kind} ${c.rule}` },
       c.words.map((w) => {
-        const g = wordGloss(w, live), unlinked = w.content && (known ? !(S.renderings || {})[w.id] : !w.linked);
+        const g = wordGloss(w, live), unlinked = known && w.content && !(S.renderings || {})[w.id];
         return el("span", { class: `w${unlinked ? " unlinked" : ""}`, title: g.tip, "data-w": w.id },
           el("span", { class: "s" }, w.surface), g.text ? el("span", { class: g.cls, dir: "ltr" }, g.text) : null);
       })));

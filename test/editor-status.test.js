@@ -16,7 +16,7 @@ const units = [
   { ref: "1:2", bases: [C], text: "Min tjener er død." },
   { ref: "1:3", bases: [E], text: "Hvert sted." },
 ];
-const hebrew = { 1: [{ key: "060010010011", kind: "VC", rule: "V", words: [{ id: "a1", surface: "מוֹת", gloss: "death", content: true, linked: true }] }] };
+const hebrew = { 1: [{ key: "060010010011", kind: "VC", rule: "V", words: [{ id: "a1", surface: "מוֹת", gloss: "death", content: true }] }] };
 start({ lang: "dan", file: "JOS/JOS_001.md", book: "JOS", chapter: 1, user: { login: "ann", agreed: true }, branch: "main", pr: null,
   units, version: {}, main: units, approved: units, hebrew,
   verses: { "1:1": { profile: "b", stale: false }, "1:2": { profile: "s", stale: false }, "1:3": { profile: "h", stale: false } },
