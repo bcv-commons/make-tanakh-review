@@ -42,11 +42,8 @@ export async function openPR(store, login) {
 // The four files of a chapter on a branch (or at a commit): { texts, versions }, and the model read from them.
 async function readFiles(store, branch, file, at = null) {
   const texts = {}, versions = {};
-  for (const ext of EXTS) {
-    const f = await store.readFile(branch, sibling(file, ext), at);
-    texts[ext] = f ? f.text : null;
-    versions[sibling(file, ext)] = f ? f.version : null;
-  }
+  const got = await Promise.all(EXTS.map((ext) => store.readFile(branch, sibling(file, ext), at)));   // side by side
+  EXTS.forEach((ext, i) => { texts[ext] = got[i] ? got[i].text : null; versions[sibling(file, ext)] = got[i] ? got[i].version : null; });
   return { texts, versions };
 }
 
@@ -59,19 +56,23 @@ async function model(store, branch, file, at = null) {
 const unitsOf = (ch) => (ch ? ch.list : []);
 
 // What the editor shows: the user's branch while they have a proposal open, else main; main and approved for comparison.
-// `index`: the book's source index (config.sourceIndex) for the poetry lines, or null (then only clause-keyed lines show).
+// `index`: the book's source index (config.sourceIndex; or its promise) for the poetry lines, or null (then only clause-keyed lines show).
 // `glossFallback`: () => the language's lexeme-glosses table (config.lexemeGlosses), used where the repo has no glosses file.
 export async function load(store, login, file, { index = null, glossFallback = null } = {}) {
+  // the reads that do not depend on the user's branch start at once, beside it (on GitHub each read is a request)
+  const later = Promise.all([model(store, MAIN, file), model(store, APPROVED, file), alternatives(store, file), language(store), publisher(store)]);
+  later.catch(() => {});                                            // awaited below; not an unhandled rejection meanwhile
   const pr = login ? await openPR(store, login) : null;
   const branch = pr ? pr.branch : MAIN;
   const cur = await model(store, branch, file);
   if (!cur) return null;
-  return { branch, pr, units: cur.list, version: cur.versions, main: unitsOf(await model(store, MAIN, file)),
-    approved: unitsOf(await model(store, APPROVED, file)), verses: verseInfo(cur), ...display(cur), poetry: await poetry(store, branch, file, cur, index),
+  index = await index;                                              // may come as a promise: fetched beside the reads above
+  const [[main, approved, alts, lang, pub], poem, gl] = await Promise.all([later, poetry(store, branch, file, cur, index),
+    glosses(store, index, file, cur, glossFallback)]);
+  return { branch, pr, units: cur.list, version: cur.versions, main: unitsOf(main),
+    approved: unitsOf(approved), verses: verseInfo(cur), ...display(cur), poetry: poem,
     renderings: cur.align && !cur.stale.align ? renderings(index, { book: file.slice(0, 3), verses: cur.verses, align: cur.align.rows }) : {},
-    ...(await glosses(store, index, file, cur, glossFallback)),
-    alternatives: await alternatives(store, file), status: readStatus(cur.md.front), language: await language(store),
-    publisher: await publisher(store) };
+    ...gl, alternatives: alts, status: readStatus(cur.md.front), language: lang, publisher: pub };
 }
 
 // The run that made the chapter's main draft (`.tanakh/runs/<BOOK>_<CCC>.json`, from the drafting side; FORMAT.md section 10)
@@ -105,11 +106,12 @@ async function alternatives(store, file) {
   const kinds = (await store.listFiles(MAIN, ALT_DIR)).map((f) => ALT_FILE.exec(f))
     .filter((m) => m && m[4] === "md" && `${m[2]}/${m[2]}_${m[3]}.md` === file).map((m) => m[1]).sort();
   if (!kinds.length) return [];
-  const about = readmeLines((await store.readFile(MAIN, `${ALT_DIR}README.md`))?.text);
+  const [readme, ...files] = await Promise.all([store.readFile(MAIN, `${ALT_DIR}README.md`),
+    ...kinds.flatMap((kind) => EXTS.map((ext) => store.readFile(MAIN, altPath(kind, file, ext))))]);   // side by side
+  const about = readmeLines(readme?.text);
   const out = [];
-  for (const kind of kinds) {
-    const texts = {};
-    for (const ext of EXTS) texts[ext] = (await store.readFile(MAIN, altPath(kind, file, ext)))?.text ?? null;
+  for (const [k, kind] of kinds.entries()) {
+    const texts = Object.fromEntries(EXTS.map((ext, i) => [ext, files[k * EXTS.length + i]?.text ?? null]));
     const ch = readChapter(texts);
     if (!ch || ch.stale.units) continue;
     const built = /^built:\s*"?([\d-]+)"?\s*$/.exec((ch.md.front || []).find((l) => l.startsWith("built:")) || "");

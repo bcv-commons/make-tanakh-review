@@ -8,13 +8,16 @@ import { currentUser } from "../../../../lib/session.js";
 import { load, chapterPath, roles } from "../../../../lib/service.js";
 const { lang, book, ch } = Astro.params;
 const user = await currentUser(Astro.cookies);
+// the Hebrew and the source index (the same for every language) are fetched beside the language repo's files
+const sideData = Promise.all([hebrew(book, Number(ch)), sourceIndex(book)]);
 const store = await storeFor(lang, user);
 const file = store && /^[A-Z0-9]{3}$/.test(book) && /^\d{1,3}$/.test(ch) ? chapterPath(book, Number(ch)) : null;
-const d = file ? await load(store, user?.login, file, { index: await sourceIndex(book), glossFallback: () => lexemeGlosses(lang) }) : null;
+const index = sideData.then(([, x]) => x);
+const d = file ? await load(store, user?.login, file, { index, glossFallback: () => lexemeGlosses(lang) }) : null;
 if (!d) return new Response("No such chapter", { status: 404 });
 rememberLanguage(lang, d.language);
 Astro.cookies.set("mtr_last", `${lang}/${book}/${Number(ch)}`, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
-const heb = (await hebrew(book, Number(ch))).verses;
+const heb = (await sideData)[0].verses;
 const data = {
   lang, file, book, chapter: Number(ch), user: user && { login: user.login, agreed: !!user.agreed, ...(await roles(store, user.login)) },
   branch: d.branch, pr: d.pr && { number: d.pr.number, status: d.pr.status }, units: d.units,

@@ -34,7 +34,8 @@ export const blobSha = (text) => {
 
 // Kept across requests: objects (commit -> its tree sha, tree -> {path: blob sha}, blob -> text; immutable, oldest dropped
 // first) and who may push to which repo ("owner/repo|login" -> true / false; looked up once).
-export const newCache = () => ({ objects: new Map(), push: new Map() });
+// Reads that are on their way are shared too (sha -> promise), so reads made side by side fetch an object once.
+export const newCache = () => ({ objects: new Map(), push: new Map(), pending: new Map() });
 const shared = newCache();
 const MAX_OBJECTS = 20000;
 
@@ -45,9 +46,10 @@ export class GitHubStore {
     Object.assign(this, { owner, repo, app, user, api, fetch });
     this.objects = cache.objects;
     this.push = cache.push;
+    this.pending = cache.pending || (cache.pending = new Map());
     this.base = `${owner}/${repo}`;
-    this.refs = new Map();       // "repo|branch" -> sha | null, for this request
-    this.prs = null;             // the pull requests, for this request
+    this.refs = new Map();       // "repo|branch" -> sha | null (or the promise of it), for this request
+    this.prs = null;             // the pull requests (or the promise of them), for this request
   }
 
   // ---- HTTP
@@ -94,8 +96,9 @@ export class GitHubStore {
   async headIn(repo, branch) {
     const key = `${repo}|${branch}`;
     if (!this.refs.has(key)) {
-      const r = await this.get(`/repos/${repo}/git/ref/heads/${enc(branch)}`, { ok404: true });
-      this.refs.set(key, r && r.object ? r.object.sha : null);
+      const p = this.get(`/repos/${repo}/git/ref/heads/${enc(branch)}`, { ok404: true }).then((r) => (r && r.object ? r.object.sha : null));
+      this.refs.set(key, p);
+      p.then((sha) => { if (this.refs.get(key) === p) this.refs.set(key, sha); }, () => { if (this.refs.get(key) === p) this.refs.delete(key); });
     }
     return this.refs.get(key);
   }
@@ -119,26 +122,30 @@ export class GitHubStore {
     return value;
   }
 
-  async treeOf(commit, repo = this.base) {
-    if (!this.objects.has(commit)) {
-      const c = await this.get(`/repos/${repo}/git/commits/${commit}`);
-      this.keep(commit, { tree: c.tree.sha });
+  // an object by its sha: kept, else fetched once however many reads ask for it at the same time
+  object(sha, fetchIt) {
+    if (this.objects.has(sha)) return Promise.resolve(this.objects.get(sha));
+    if (!this.pending.has(sha)) {
+      const p = fetchIt().then((v) => this.keep(sha, v)).finally(() => this.pending.delete(sha));
+      this.pending.set(sha, p);
     }
-    const tree = this.objects.get(commit).tree;
-    if (!this.objects.has(tree)) {
-      const t = await this.get(`/repos/${repo}/git/trees/${tree}?recursive=1`);
-      if (t.truncated) throw new GitHubError(500, `the tree of ${commit} is too large to read in one call`);
-      this.keep(tree, Object.fromEntries(t.tree.filter((e) => e.type === "blob").map((e) => [e.path, e.sha])));
-    }
-    return this.objects.get(tree);
+    return this.pending.get(sha);
   }
 
-  async blob(sha, repo = this.base) {
-    if (!this.objects.has(sha)) {
+  async treeOf(commit, repo = this.base) {
+    const { tree } = await this.object(commit, async () => ({ tree: (await this.get(`/repos/${repo}/git/commits/${commit}`)).tree.sha }));
+    return this.object(tree, async () => {
+      const t = await this.get(`/repos/${repo}/git/trees/${tree}?recursive=1`);
+      if (t.truncated) throw new GitHubError(500, `the tree of ${commit} is too large to read in one call`);
+      return Object.fromEntries(t.tree.filter((e) => e.type === "blob").map((e) => [e.path, e.sha]));
+    });
+  }
+
+  blob(sha, repo = this.base) {
+    return this.object(sha, async () => {
       const b = await this.get(`/repos/${repo}/git/blobs/${sha}`);
-      this.keep(sha, Buffer.from(b.content, b.encoding === "base64" ? "base64" : "utf8").toString("utf8"));
-    }
-    return this.objects.get(sha);
+      return Buffer.from(b.content, b.encoding === "base64" ? "base64" : "utf8").toString("utf8");
+    });
   }
 
   async readFile(branch, file, at = null) {
@@ -247,8 +254,13 @@ export class GitHubStore {
   }
 
   // the open pull requests into main, and the last ten closed ones (the review page shows those)
-  async listPRs() {
-    if (!this.prs) {
+  listPRs() {
+    if (!this.prs) this.prs = this.readPRs().catch((e) => { this.prs = null; throw e; });
+    return Promise.resolve(this.prs);
+  }
+
+  async readPRs() {
+    {
       const open = [];
       for (let page = 1; ; page++) {
         const list = await this.get(`/repos/${this.base}/pulls?state=open&base=${MAIN}&per_page=100&page=${page}`);
@@ -256,9 +268,8 @@ export class GitHubStore {
         if (list.length < 100) break;
       }
       const closed = await this.get(`/repos/${this.base}/pulls?state=closed&base=${MAIN}&sort=updated&direction=desc&per_page=10`);
-      this.prs = [...closed.reverse(), ...open.sort((a, b) => a.number - b.number)].map((p) => this.record(p));
+      return [...closed.reverse(), ...open.sort((a, b) => a.number - b.number)].map((p) => this.record(p));
     }
-    return this.prs;
   }
 
   // The user's own pull request from their branch, under their token; the CC0 agreement is in its body (PLAN.md 15.2 point 4).

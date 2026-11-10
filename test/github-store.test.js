@@ -115,3 +115,20 @@ test("the App's installation token is minted from its key and kept until it near
   const wrong = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
   await assert.rejects(appTokens({ appId: 123, privateKey: wrong, org: "global-tanakh", fetch: gh.fetch })(), /401/);
 });
+
+test("reads side by side fetch each object once: the head, the commit, the tree, a blob", async () => {
+  const { gh } = await fresh();
+  const s = new GitHubStore({ owner: "global-tanakh", repo: "dan", app: gh.appToken(), fetch: gh.fetch, cache: newCache() });
+  const before = gh.calls.length;
+  const got = await Promise.all([s.readFile("main", "A/a.md"), s.readFile("main", "A/a.md"), s.readFile("main", "README.md"),
+    s.listFiles("main"), s.listPRs(), s.listPRs()]);
+  assert.equal(got[0].text, "one\n");
+  assert.equal(got[2].text, "readme\n");
+  const calls = gh.calls.slice(before).filter((c) => !c.includes("access_tokens") && !c.includes("/installation"));
+  const count = (re) => calls.filter((c) => re.test(c)).length;
+  assert.equal(count(/ref\/heads\/main$/), 1);
+  assert.equal(count(/git\/commits\//), 1);
+  assert.equal(count(/git\/trees\//), 1);
+  assert.equal(count(/git\/blobs\//), 2);                                  // two files, each once
+  assert.equal(count(/pulls\?state=open/), 1);
+});

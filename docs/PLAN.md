@@ -404,6 +404,13 @@ In detail (2026-11-03, as the code expects it):
   The source index (`config.sourceIndex`: the lists the `.align` ordinals count, and their lexemes) is fetched the same way,
   from bcv-commons/compact-alignments at a pinned revision (11583082; its books' files unchanged from the copy fetched before;
   `tools/fetch_index.mjs` now reads the same revision). With both, a deployed site needs no prepared files.
+- **2026-11-10: the site is up (https://review-bibel-wiki.netlify.app, global-tanakh's zin and kvg); pages made faster.** A
+  chapter page on a fresh instance made 35 requests one after another (some 22 file reads from GitHub): 28 s from here,
+  2.5-9 s on Netlify, near its 10 s limit. Now `load` reads the files that do not depend on the user's branch side by side
+  (main, approved, the alternatives, language.json, publisher.json; a chapter's four files together), the page fetches the
+  Hebrew and the source index beside them, and GitHubStore shares a read already on its way (trees and blobs by sha, a
+  branch head per request, the pull requests), so parallel reads fetch an object once. From here: about 6 s cold, about 1 s
+  warm (two requests: the heads of main and approved). Netlify's secret scan skips the public settings (netlify.toml).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
