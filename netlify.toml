@@ -5,3 +5,6 @@
 
 [build.environment]
   NODE_VERSION = "22.22.1"
+  # Netlify's secret scan: these values are public (the organisation's name is all through the code and docs; the App's
+  # id and client id are shown to every user at sign-in). The key and the two secrets stay scanned.
+  SECRETS_SCAN_OMIT_KEYS = "MTR_GITHUB_ORG,MTR_GITHUB_APP_ID,MTR_GITHUB_CLIENT_ID"
