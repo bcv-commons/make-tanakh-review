@@ -8,7 +8,7 @@
 // Alternative drafts (`.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.*`, FORMAT.md section 9) are chapters too and get every
 // chapter check, plus their own front matter keys.
 // --author: the pull request's author; a pull request by anyone but the publisher (.tanakh/publisher.json `login`) that touches
-// the derived files (the alternatives, .tanakh/runs/, .parts, .feats) gets a notice.
+// the derived files (the alternatives, .tanakh/runs/, .tanakh/clause-features.json, .parts) gets a notice.
 // The edit records (.tanakh/edits/, FORMAT.md section 10) and .tanakh/language.json (section 11) are checked for their form.
 // format.js and vendor/tokenize.js are copies of make-tanakh-review's src/lib/format.js and src/lib/vendor/tokenize.js (its
 // tests keep them identical); the tokeniser is the published reference of bcv-commons/compact-alignments.
@@ -18,16 +18,16 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
-  parseMd, mdVerses, parseUnits, unitId, parseNotes, headerHash, hashInput, tokenize, cleanText, refKey, PROFILES, ALIGN_ITEM,
+  parseMd, mdVerses, parseUnits, unitId, parseNotes, headerHash, hashInput, tokenize, tokenSpans, cleanText, refKey, PROFILES, ALIGN_ITEM,
 } from "./format.js";
 
-const CHAPTER = /^([A-Z0-9]{3})\/\1_(\d{3})\.(md|units|notes|align)$/;
-const ALT = /^\.tanakh\/alternatives\/([a-z0-9-]+)\/([A-Z0-9]{3})\/\2_(\d{3})\.(md|units|notes|align)$/;
+const CHAPTER = /^([A-Z0-9]{3})\/\1_(\d{3})\.(md|units|notes|align|parts)$/;
+const ALT = /^\.tanakh\/alternatives\/([a-z0-9-]+)\/([A-Z0-9]{3})\/\2_(\d{3})\.(md|units|notes|align|parts)$/;
 const ALT_DIR = ".tanakh/alternatives/", ALT_README = `${ALT_DIR}README.md`;
 const EDITS = /^\.tanakh\/edits\/([A-Z0-9]{3})\/\1_(\d{3})\/(\d{8}T\d{6}Z)-([A-Za-z0-9-]+)\.jsonl$/;
 const EDIT_OPS = new Set(["M", "R", "U", "WO"]);
 const EDIT_CATS = new Set(["SPELL", "TONE", "AFFIX", "FUNC", "WORD", "NEW", "ORDER", "SPLIT", "JOIN", "CHOICE", "OTHER"]);
-const DERIVED = (p) => p.startsWith(ALT_DIR) || p.startsWith(".tanakh/runs/") || /\.(parts|feats)$/.test(p);
+const DERIVED = (p) => p.startsWith(ALT_DIR) || p.startsWith(".tanakh/runs/") || p === ".tanakh/clause-features.json" || /\.parts$/.test(p);
 const BOOK_DIR = /^[A-Z0-9]{3}\//;
 const SIDECARS = ["units", "notes", "align"];
 const NOTE_KINDS = new Set(["T", "E", "H", "N"]);
@@ -64,7 +64,7 @@ export function validate(files, { keys = null, changed = null, author = null } =
     if (file.startsWith(ALT_DIR)) { if (file !== ALT_README) err(file, "not a file of the alternative drafts: .tanakh/alternatives/ holds README.md and <kind>/<BOOK>/<BOOK>_<CCC>.md, .units, .notes, .align (FORMAT.md section 9)"); continue; }
     const m = CHAPTER.exec(file);
     if (m) { const base = file.replace(/\.\w+$/, ""); if (!chapters.has(base)) chapters.set(base, { book: m[1], ch: Number(m[2]) }); chapters.get(base)[m[3]] = text; continue; }
-    if (BOOK_DIR.test(file) && !file.startsWith(".")) err(file, "not a chapter file: a book folder holds <BOOK>_<CCC>.md, .units, .notes and .align only");
+    if (BOOK_DIR.test(file) && !file.startsWith(".")) err(file, "not a chapter file: a book folder holds <BOOK>_<CCC>.md, .units, .notes, .align and .parts only");
     else if (!OTHER.some((re) => re.test(file))) err(file, "not a file of a language repository (FORMAT.md section 6)");
   }
 
@@ -77,7 +77,7 @@ export function validate(files, { keys = null, changed = null, author = null } =
       if (c.md !== undefined && missing.length) err(f(missing[0]), `an alternative draft has all four files: ${missing.map((x) => f(x)).join(", ")} missing`);
       if (!files.has(`${c.book}/${c.book}_${String(c.ch).padStart(3, "0")}.md`)) notices.push({ file: f("md"), msg: `an alternative of ${c.book} ${c.ch}, which the repository does not have` });
     }
-    if (c.md === undefined) { for (const ext of SIDECARS) if (c[ext] !== undefined) err(f(ext), `a sidecar without its text file ${f("md")}`); continue; }
+    if (c.md === undefined) { for (const ext of [...SIDECARS, "parts"]) if (c[ext] !== undefined) err(f(ext), `a sidecar without its text file ${f("md")}`); continue; }
     const md = parseMd(c.md);
     for (const e of md.errors) { const n = /^line (\d+)/.exec(e); err(f("md"), e, n ? Number(n[1]) : undefined); }
     if (!md.front.includes(`book: ${c.book}`)) err(f("md"), `front matter: no line "book: ${c.book}"`, 2);
@@ -149,6 +149,8 @@ export function validate(files, { keys = null, changed = null, author = null } =
       }
     }
 
+    if (c.parts !== undefined) checkParts(f("parts"), c.parts, verses, err, notices);
+
     if (c.align !== undefined) {
       const seen = new Set();
       c.align.split("\n").forEach((l, i) => {
@@ -183,11 +185,51 @@ export function validate(files, { keys = null, changed = null, author = null } =
     try { pub = JSON.parse(files.get(".tanakh/publisher.json") || "null")?.login || null; } catch { /* no publisher named */ }
     const derived = changed.filter((p) => p && DERIVED(p));
     if (derived.length && !(author && pub && author === pub))
-      notices.push({ file: "", msg: `this pull request${author ? ` by ${author}` : ""} changes derived files (${derived.length}: the alternatives, .tanakh/runs/, .parts, .feats): only the publisher${pub ? ` (${pub})` : ""} writes them, they are never edited` });
+      notices.push({ file: "", msg: `this pull request${author ? ` by ${author}` : ""} changes derived files (${derived.length}: the alternatives, .tanakh/runs/, clause-features.json, .parts): only the publisher${pub ? ` (${pub})` : ""} writes them, they are never edited` });
     const other = changed.filter((p) => p && !CHAPTER.test(p) && !DERIVED(p) && !EDITS.test(p));
     if (other.length) notices.push({ file: "", msg: `this pull request changes files other than chapter files (${other.join(", ")}): it is merged on github.com, not in the editor` });
   }
   return { errors, notices, chapters: chapters.size };
+}
+
+// <BOOK>_<CCC>.parts (FORMAT.md section 12, derived, written by the publisher): per verse a hash of its own and one cell per
+// token, `n=<text>:<slot>[:<morph id>]|...`; the pieces joined (the tone marks put back) give the token. A row whose verse hash
+// does not match the verse is stale: a notice, not an error (the publisher rebuilds it).
+const PARTS_HEADER = /^# parts: make-tanakh-parts\/1;/;
+const SLOT = /^(whole|stem|[psi]\d+)$/;
+const bareOf = (x) => x.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
+function checkParts(file, text, verses, err, notices) {
+  const lines = text.split("\n");
+  if (!PARTS_HEADER.test(lines[0] || "")) err(file, "the first line must be `# parts: make-tanakh-parts/1; splitter ...; unicode ...`", 1);
+  const byRef = new Map(verses.map((v) => [v.ref, v.text])), seen = new Set();
+  let stale = 0;
+  lines.forEach((l, i) => {
+    if (!l || l.startsWith("#")) return;
+    const line = i + 1, [ref, hash, ...cells] = l.split("\t");
+    if (seen.has(ref)) err(file, `verse ${ref} twice`, line);
+    seen.add(ref);
+    if (!byRef.has(ref)) { err(file, `verse ${ref} is not in the text`, line); return; }
+    const vt = byRef.get(ref);
+    if (!/^[0-9a-f]{8}$/.test(hash || "")) { err(file, `${ref}: the verse hash is 8 hex digits`, line); return; }
+    if (sha256(`${ref}\t${vt}`).slice(0, 8) !== hash) { stale++; return; }
+    const s = vt.normalize("NFC"), spans = tokenSpans(s), toks = tokenize(vt);
+    if (cells.length !== spans.length) { err(file, `${ref}: ${cells.length} cells for ${spans.length} tokens`, line); return; }
+    cells.forEach((cell, t) => {
+      const m = /^(\d+)=(.+)$/.exec(cell);
+      if (!m || Number(m[1]) !== t) { err(file, `${ref}: cell ${t + 1} is not \`${t}=<pieces>\``, line); return; }
+      let joined = "", tone = false;
+      for (const p of m[2].split("|")) {
+        if (p.startsWith(":tone")) { tone = true; continue; }
+        const [txt, slot] = p.split(":");
+        if (!txt || !SLOT.test(slot || "")) { err(file, `${ref}: token ${t}: cannot read the piece ${JSON.stringify(p)}`, line); return; }
+        joined += txt;
+      }
+      const surface = s.slice(spans[t].start, spans[t].end), j = joined.normalize("NFC");
+      const ok = tone ? bareOf(j) === bareOf(surface) : j === surface.normalize("NFC") || j === toks[t].normalize("NFC");
+      if (!ok) err(file, `${ref}: token ${t}: the pieces give ${JSON.stringify(j)}, the token is ${JSON.stringify(surface)}`, line);
+    });
+  });
+  if (stale) notices.push({ file, msg: `${stale} verse row(s) stale (the verse changed since the parts were made): the publisher rebuilds them` });
 }
 
 // One edit record file: its name, and each line a JSON object with the agreed fields (FORMAT.md section 10)

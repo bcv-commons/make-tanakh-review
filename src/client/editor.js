@@ -85,6 +85,16 @@ function wordGloss(w, live) {
   return r ? { text: r, tip, cls: "g" } : { text: usual ? usual[0][0] : null, tip: tip || null, cls: "g c" };
 }
 
+// The Hebrew of a clause piece: `key` the first piece, `key/n` the n-th piece of that clause, counted over the chapter's verses
+// in order (a piece may stand in a later verse than the clause's first)
+function piece(verse, b) {
+  const key = clauseKey(b), n = Number((/\/(\d+)$/.exec(b) || [0, 1])[1]);
+  const vs = Object.keys(S.hebrew || {}).map(Number).sort((x, y) => x - y).filter((v) => v <= Number(verse));
+  const all = vs.flatMap((v) => (S.hebrew[v] || []).filter((x) => x.key === key).map((x) => ({ v, x })));
+  const hit = all[n - 1];
+  return hit && hit.v === Number(verse) ? hit.x : (n === 1 ? (S.hebrew[verse] || []).find((x) => x.key === key) : null);
+}
+
 function hebrewCell(verse, u, seen) {
   const clauses = S.hebrew[verse] || [];
   // the loaded alignment still fits the verse: its links say which content words are rendered
@@ -92,10 +102,15 @@ function hebrewCell(verse, u, seen) {
   const info = (S.verses || {})[u.ref] || {}, known = live && !info.stale && !!info.profile && Object.keys(S.renderings || {}).length > 0;
   const cell = el("div", { class: "heb", dir: "rtl", lang: "he" });
   for (const b of u.bases) {
-    const key = clauseKey(b), c = clauses.find((x) => x.key === key);
+    const key = clauseKey(b), c = piece(verse, b);
     if (!c) { cell.append(el("div", { class: "muted", dir: "ltr" }, `(clause ${key})`)); continue; }
-    if (seen.has(key)) { cell.append(el("div", { class: "cont", dir: "ltr" }, "… the same Hebrew clause, continued")); continue; }
-    seen.add(key);
+    if (seen.has(b)) { cell.append(el("div", { class: "cont", dir: "ltr" }, "… the same Hebrew clause, continued")); continue; }
+    seen.add(b);
+    // a later piece of a clause another clause interrupts (`/2`, `/3`: FORMAT.md section 3): its own words, and which clause it continues
+    const first = /\/\d+$/.test(b) ? Object.keys(S.hebrew || {}).map(Number).sort((x, y) => x - y)
+      .flatMap((v) => S.hebrew[v] || []).find((x) => x.key === key) : null;
+    if (first) cell.append(el("div", { class: "cont", dir: "ltr", title: "The clause is interrupted by another one; this is its next piece" },
+      `… continues the clause “${first.words.slice(0, 3).map((w) => w.surface).join(" ")}”`));
     cell.append(el("div", { class: "clause", title: `${c.kind} ${c.rule}` },
       c.words.map((w) => {
         const g = wordGloss(w, live), unlinked = w.content && (known ? !(S.renderings || {})[w.id] : !w.linked);

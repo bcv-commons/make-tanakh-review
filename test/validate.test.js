@@ -83,3 +83,24 @@ test("edit records and language.json: their form", () => {
   const n = validate(repo(), { keys: KEYS, changed: ["JOS/JOS_001.md", P] }).notices;
   assert.ok(!n.some((x) => /github\.com/.test(x.msg)));                               // the editor's own records: no notice
 });
+
+test(".parts: derived, a verse hash per row (stale = a notice), one cell per token, the pieces give the token", async () => {
+  const { createHash } = await import("node:crypto");
+  const h = (ref, t) => createHash("sha256").update(`${ref}\t${t}`, "utf8").digest("hex").slice(0, 8);
+  const V1 = "Efter at Moses var død, sagde HERREN til Josva:", V2 = "Min tjener er død.";
+  const cells = (ws) => ws.map((w, i) => `${i}=${w}`).join("\t");
+  const good = ["Ef:p1|ter:stem", "at:whole", "Moses:whole", "var:whole", "død:whole", "sag:stem|de:s1:m:de-pst:verb", "HERREN:whole", "til:whole", "Josva:whole"];
+  const parts = (rows) => `# parts: make-tanakh-parts/1; splitter morphs.py@0123456789ab; unicode 15.1\n${rows.join("\n")}\n`;
+  const P = (rows) => problems(repo(undefined, { "JOS/JOS_001.parts": parts(rows) }));
+  assert.deepEqual(P([`1:1\t${h("1:1", V1)}\t${cells(good)}`, `1:2\t${h("1:2", V2)}\t${cells(["Min:whole", "tjen:stem|er:s1", "er:whole", "død:whole"])}`]), []);
+  assert.match(P([`1:1\t${h("1:1", V1)}\t${cells(good.slice(0, 8))}`])[0], /8 cells for 9 tokens/);
+  assert.match(P([`1:1\t${h("1:1", V1)}\t${cells(["Ef:p1|tr:stem", ...good.slice(1)])}`])[0], /token 0: the pieces give "Eftr"/);
+  assert.match(P([`1:1\t${h("1:1", V1)}\t${cells(["Efter:root", ...good.slice(1)])}`])[0], /cannot read the piece/);
+  const stale = validate(repo(undefined, { "JOS/JOS_001.parts": parts([`1:1\t00000000\t${cells(good)}`]) }), { keys: KEYS });
+  assert.deepEqual(stale.errors, []);
+  assert.match(stale.notices.find((n) => /stale/.test(n.msg)).msg, /1 verse row/);
+  assert.match(problems(repo(undefined, { "JOS/JOS_001.parts": "# parts: other\n" }))[0], /make-tanakh-parts\/1/);
+  assert.match(problems(repo(undefined, { "JOS/JOS_002.parts": parts([]) }))[0], /without its text file/);
+  // with a tone piece: compared without marks
+  assert.deepEqual(P([`1:1\t${h("1:1", V1)}\t${cells(["Efter:stem|:tone:H@1:\u0301", ...good.slice(1)])}`]), []);
+});

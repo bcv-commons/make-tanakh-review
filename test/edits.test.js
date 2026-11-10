@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { editRows, choiceRows, vocabulary, editsPath, EDITS_FILE } from "../src/lib/edits.js";
+import { editRows, choiceRows, vocabulary, editsPath, draftRun, EDITS_FILE } from "../src/lib/edits.js";
 import { readChapter, readStatus, setStatus } from "../src/lib/chapter.js";
 import { applyBox } from "../src/lib/units.js";
 import { LocalGitStore } from "../src/lib/store/local-git.js";
@@ -72,17 +72,27 @@ test("a save writes the rows beside the chapter, the status and its date; a merg
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mtr-ed-"));
   execFileSync("git", ["init", "-q", "--bare", "-b", "main", path.join(dir, "x.git")]);
   const s = new LocalGitStore(path.join(dir, "x.git"), path.join(dir, "state.json"));
-  s.writeFiles("main", files("JOS/JOS_001", chapterFiles()), { message: "seed" });
+  s.writeFiles("main", { ...files("JOS/JOS_001", chapterFiles()),
+    ".tanakh/runs/JOS_001.json": JSON.stringify({ book: "JOS", chapter: 1, drafts: { llm: { run: "llm-2026-11-09-a" }, nllb: { run: "nllb-7" } } }),
+    ".tanakh/alternatives/nllb/JOS/JOS_001.md": "x" }, { message: "seed" });
   s.saveState({ prs: [], roles: { reviewers: ["rev"], team: [] } });
   const F = "JOS/JOS_001.md";
   const d = await S.load(s, "ann", F);
   const units = applyBox(d.units, 1, "talte HERREN til Josva:").units;
   await S.save(s, "ann", F, units, d.version, null, { status: { maturity: "Gennemset" }, uses: [{ ref: "1:1", bases: [B], kind: "shape" }], now: WHEN });
   const rows = s.readFile("edit/ann", ".tanakh/edits/JOS/JOS_001/20261110T081530Z-ann.jsonl").text.trim().split("\n").map((l) => JSON.parse(l));
-  assert.deepEqual(rows.map((r) => [r.op, r.cat, r.old, r.new, r.from_alt]), [["R", "NEW", "sagde", "talte", "shape"]]);
+  assert.deepEqual(rows.map((r) => [r.op, r.cat, r.old, r.new, r.from_alt, r.draft]), [["R", "NEW", "sagde", "talte", "shape", "llm-2026-11-09-a"]]);
   const st = (await S.load(s, "ann", F)).status.values;
   assert.equal(st.maturity, "Gennemset");
   assert.equal(st.date, "10.11.2026");
   await S.mergePR(s, "rev", 1);                                     // the edit records do not send it to github.com
   assert.ok(s.readFile("main", ".tanakh/edits/JOS/JOS_001/20261110T081530Z-ann.jsonl"));
+});
+
+test("draft: the main draft's run", () => {
+  const d = (drafts) => ({ book: "JOS", chapter: 1, drafts });
+  assert.equal(draftRun(d({ main: { run: "m1" }, llm: { run: "l1" } })), "m1");
+  assert.equal(draftRun(d({ llm: { run: "l1" }, nllb: { run: "n1" }, shape: { run: "s1" } }), ["nllb", "shape"]), "l1");
+  assert.equal(draftRun(d({ llm: { run: "l1" }, rules: { run: "r1" } }), []), null);       // which is the main draft? not said
+  assert.equal(draftRun(null), null);
 });

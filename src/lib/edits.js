@@ -83,10 +83,11 @@ function unitAt(row, t) {
 }
 
 // The rows of one save. before/after: chapter models (chapter.js readChapter); who, when (a Date); uses: [{ ref, bases, kind }]
-// (the "use" button since the last save); vocab: a Set of known lower-case words; commit: the commit the edit was made on.
-export function editRows({ before, after, who, when, uses = [], vocab = new Set(), commit = null }) {
+// (the "use" button since the last save); vocab: a Set of known lower-case words; commit: the commit the edit was made on;
+// draft: the run that made the main draft (draftRun).
+export function editRows({ before, after, who, when, uses = [], vocab = new Set(), commit = null, draft = null }) {
   const rows = [], at = when.toISOString();
-  const base = { who, when: at, scope: "this", entry: null, draft: null, why: null, commit };
+  const base = { who, when: at, scope: "this", entry: null, draft, why: null, commit };
   const textOf = (ch, ref) => ch.verses.find((v) => v.ref === ref)?.text;
   for (const { ref } of after.verses) {
     const o = textOf(before, ref), n = textOf(after, ref);
@@ -164,6 +165,15 @@ export function choiceRows(conflicts, choices, { who, when, commit = null }) {
       from_alt: null, entry: null, draft: null, why: null, commit });
   }
   return out;
+}
+
+// The run that made a chapter's main draft, from `.tanakh/runs/<BOOK>_<CCC>.json` ({ book, chapter, drafts: { <kind>: { run, ... } } }):
+// the kind `main`, else the one kind that is not an alternative (`alternatives`: the kinds under .tanakh/alternatives/), else null
+export function draftRun(runs, alternatives = []) {
+  const d = runs && typeof runs.drafts === "object" && runs.drafts ? runs.drafts : null;
+  if (!d) return null;
+  const pick = d.main || (() => { const k = Object.keys(d).filter((x) => !alternatives.includes(x)); return k.length === 1 ? d[k[0]] : null; })();
+  return pick && typeof pick.run === "string" ? pick.run : null;
 }
 
 export const jsonl = (rows) => rows.map((r) => JSON.stringify(r)).join("\n") + "\n";

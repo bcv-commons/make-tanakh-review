@@ -83,7 +83,11 @@ The compact-alignments working file as the drafting agents deliver it (make-tana
   as kago as one token, so Greek needs no part digit).
 - `key:a-b` the unit's tokens (inclusive); `key:a-b,c` scattered (the first range is where the unit's line begins);
   `key:=` a clause with no words of its own (shown with the line before it).
-- `key/2`, `key/3`: the layout's own second and third segment of a Hebrew clause that is discontinuous in the Hebrew.
+- `key/2`, `key/3`: the layout's own second and third segment of a Hebrew clause that is discontinuous in the Hebrew (another
+  clause stands inside it; the layout's clauses form a tree, `parent_key` and `depth` per row). All pieces share the key. A
+  draft may render the whole clause at its first piece and write the later ones `=`; a reviewer's text may fill them. A key
+  may appear more than once in a verse, and a later piece may stand in a later verse; the editor shows each piece's own
+  Hebrew words.
   `key.2`: a translator's split of one Hebrew clause into two target units (`#` in the editor); `%` joins two keys into one
   unit, written as the first key owning the range and the second as `=`.
 - Header: `authored` (the draft was written in clause lines matching the layout), `aligned` (a first cut from the `.align`
@@ -129,6 +133,8 @@ exactly where the word's rendering begins: 97.6% of the 24,329 lines), `in` or `
   request that touches them gets a notice (only the publisher writes them). `layout_keys.py` takes their books too.
 - Derived files (the alternatives, `.tanakh/runs/`, `.parts`, `.feats`): a pull request by anyone but the publisher
   (`.tanakh/publisher.json` `login`) that touches them gets a notice.
+- `.parts` (section 12): the header; per row its verse (a row whose verse hash does not match is stale: a notice, not an
+  error), one cell per token, readable pieces that give the token.
 - Edit records (section 10): the file name, each line a JSON object, `who` the file's login, `op`, `cat` and `scope` from the
   lists, `ref` a verse of the chapter. `.tanakh/language.json` (section 11): its three keys.
 
@@ -226,8 +232,9 @@ the proposal is merged. One file per save, so two proposals never touch the same
   by the author when bringing in the working text (`choice`: `ours` = their own, `theirs` = the working text); `OTHER`
   punctuation or spacing only. `AFFIX` is given by the drafting side at intake (it needs the word's parts).
 - `from_alt`: the alternative (section 9) whose words the reviewer put in the unit with "use", if any. `scope` is `this` (a
-  question "only here, or for clauses like this?" may make it `similar`); `entry` a register entry, `draft` the run of the
-  draft (from `.tanakh/runs/`, when there is one), `why` the reviewer's own words, all optional.
+  question "only here, or for clauses like this?" may make it `similar`); `entry` a register entry, `draft` the run that made
+  the main draft (`.tanakh/runs/<BOOK>_<CCC>.json` `drafts.<kind>.run`, the kind `main`, else the one kind that is not an
+  alternative), `why` the reviewer's own words, all optional.
 - Written by the editor only, never edited; the drafting side reads them at tagged revisions.
 
 ## 11. The language (`.tanakh/language.json`)
@@ -238,3 +245,31 @@ the proposal is merged. One file per save, so two proposals never touch the same
 
 `code` the ISO 639-3 code (the repository's name); `name` in English; `native` optional; `bcp47` the tag for spell checking and
 fonts (the two-letter code where there is one). Written when the repository is made (`tools/init_language.sh`).
+
+## 12. Word parts (`<BOOK>_<CCC>.parts`, derived; make-tanakh-parts/1, agreed with make-tanakh-grammar 2026-11-10)
+
+Written by the publisher beside a chapter (and beside an alternative), never edited; rebuilt at the drafting side's intake.
+
+```
+# parts: make-tanakh-parts/1; splitter morphs.py@<12 hex> bcv_segment.py@<12 hex> seg_facts.json@<12 hex>; unicode <version>
+1:1	6ec2d3f5	0=Omu:whole	1=...	4=ba:p2:m:ba-sm:verb|ka:p3:m:ka-pst:verb|ba:stem
+```
+
+- A row per verse: `c:v`, the verse hash (the first 8 hex of the SHA-256 of `c:v<TAB><verse text>`), one cell per token of the
+  standard tokeniser, `n=<pieces>`. No `# text` line: a verse whose hash no longer matches is stale (a CI notice); the other
+  rows stay valid.
+- Pieces, joined by `|`: `<text>:<slot>[:<morph id>]`, slot `whole`, `stem`, `p<n>`, `s<n>`, `i<n>` (prefix, suffix, infix by
+  position); the morph id names a register entry. A tone piece `:tone[:<label>]@<pos>:<mark>;...` (pos in letters from the
+  word's end). The pieces' texts joined, the tone marks put back, give the token (NFC).
+
+## 13. The drafting side's other files
+
+- `.tanakh/runs/<BOOK>_<CCC>.json`: `{ book, chapter, drafts: { <kind>: { run, label, model, prompts sha256, code, register,
+  built } } }`, which run made each draft (section 10's `draft`).
+- `.tanakh/clause-features.json`: a pointer, not values: the clause features "clauses like this" match on are in the CC BY-SA
+  dataset bcv-commons/clause-columns, which never enters a language repo (CC0). The file names the dataset, its revision, the
+  file and its SHA-256, the layout it is keyed by, the join (a `.units` key's part before `-` is the dataset's `clause_key`;
+  all pieces `/n` share it), and the columns to match on.
+- `.tanakh/publisher.json`: `{ login, name, url }`. These, the alternatives and `.parts` are derived: a pull request by anyone
+  but the publisher's `login` that touches them gets a notice.
+

@@ -373,6 +373,15 @@ In detail (2026-11-03, as the code expects it):
   `.tanakh/publisher.json` shown as who made the drafts; CI: the edit records' and language file's form, a notice when anyone
   but the publisher's `login` touches derived files (`--author` from the workflow). Not yet: `.parts`/`.feats` in the check
   (their formats follow), per-token menus, the scope question, the register and answer boxes.
+- **2026-11-10: the derived formats (make-tanakh-grammar).** `.parts` (make-tanakh-parts/1, FORMAT.md section 12) is checked:
+  verse hash per row (stale = a notice), a cell per token, pieces giving the token (tone pieces compared without marks); in
+  book folders and beside alternatives. `.feats` is dropped for `.tanakh/clause-features.json`, a pointer to the CC BY-SA
+  bcv-commons/clause-columns (values never copied into a repo). `draft` in the edit records now comes from `.tanakh/runs/`
+  (the kind `main`, else the one kind that is not an alternative; asked them which key the main draft has). Clauses inside
+  clauses (their point 6; 2,266 clauses in pieces, 9 % of verses): the editor showed a later piece `key/2` as "the same Hebrew
+  clause, continued" with the first piece's words; it now shows the piece's own words and which clause it continues. Checked
+  that nothing else assumes a key once per verse or one span per clause (agreement unites the pieces; edit rows name
+  `key/2`). Not used yet: the tree (`parent_key`, `depth`) for indenting inner clauses.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

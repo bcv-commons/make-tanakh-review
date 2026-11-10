@@ -6,7 +6,7 @@ import { renderings, wordLexemes, chapterGlosses } from "./renderings.js";
 import { ALT_FILE, ALT_DIR, altPath, altUnits, readmeLines } from "./alternatives.js";
 import { changedVerses } from "./units.js";
 import { readChapter, buildChapter, mergeChapter, verseInfo, display, EXTS, sibling, chapterOf, readStatus, setStatus } from "./chapter.js";
-import { editRows, choiceRows, editsPath, jsonl, vocabulary, EDITS_DIR } from "./edits.js";
+import { editRows, choiceRows, editsPath, jsonl, vocabulary, draftRun, EDITS_DIR } from "./edits.js";
 import { parseMd, serializeMd } from "./format.js";
 import { StaleError } from "./store/errors.js";
 import { BOOK_ORDER } from "./config.js";
@@ -72,6 +72,15 @@ export async function load(store, login, file, { index = null, glossFallback = n
     ...(await glosses(store, index, file, cur, glossFallback)),
     alternatives: await alternatives(store, file), status: readStatus(cur.md.front), language: await language(store),
     publisher: await publisher(store) };
+}
+
+// The run that made the chapter's main draft (`.tanakh/runs/<BOOK>_<CCC>.json`, from the drafting side; FORMAT.md section 10)
+async function chapterRun(store, branch, file) {
+  const f = await store.readFile(branch, `.tanakh/runs/${file.split("/")[1].replace(/\.md$/, "")}.json`);
+  let j = null;
+  try { j = f && JSON.parse(f.text); } catch { return null; }
+  const alts = [...new Set((await store.listFiles(MAIN, ALT_DIR)).map((p) => ALT_FILE.exec(p)?.[1]).filter(Boolean))];
+  return draftRun(j, alts);
 }
 
 // The repo's own description of its language (`.tanakh/language.json`, FORMAT.md section 11): { code, name, native, bcp47 }, or null
@@ -166,7 +175,7 @@ export async function save(store, login, file, list, version, message, { status 
   for (const [ext, text] of Object.entries(b.files)) if (text !== cur.texts[ext]) files[sibling(file, ext)] = text;
   const after = readChapter({ ...cur.texts, ...b.files });
   const rows = editRows({ before: cur, after, who: login, when: now, uses: Array.isArray(uses) ? uses : [],
-    vocab: vocabulary(await glossTable(store), cur), commit: await store.branchHead(branch) });
+    vocab: vocabulary(await glossTable(store), cur), commit: await store.branchHead(branch), draft: await chapterRun(store, branch, file) });
   if (rows.length) {
     const p = editsPath(file, now, login), had = await store.readFile(branch, p);
     files[p] = (had ? had.text : "") + jsonl(rows);
@@ -253,7 +262,8 @@ export async function updateBranch(store, login, choices = null) {
   const { out } = first.conflicts.length ? await mergeFiles(store, pr.branch, MAIN, choices) : first;
   if (first.conflicts.length) {                                     // the author's choices are edit records too
     const now = new Date(), commit = await store.branchHead(pr.branch);
-    for (const [f, rows] of Object.entries(choiceRows(first.conflicts, choices, { who: login, when: now, commit }))) out[editsPath(f, now, login)] = jsonl(rows);
+    for (const [f, rows] of Object.entries(choiceRows(first.conflicts, choices, { who: login, when: now, commit })))
+      out[editsPath(f, now, login)] = jsonl(rows);
   }
   await store.commitMerge(pr.branch, MAIN, out, { message: `Bring in main`, coAuthor: login });
   await store.updatePR(pr.number, { status: "open" });
