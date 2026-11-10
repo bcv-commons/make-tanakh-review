@@ -168,11 +168,11 @@ export function choiceRows(conflicts, choices, { who, when, commit = null }) {
 }
 
 // The run that made a chapter's main draft, from `.tanakh/runs/<BOOK>_<CCC>.json` ({ book, chapter, drafts: { <kind>: { run, ... } } }):
-// the kind `main`, else the one kind that is not an alternative (`alternatives`: the kinds under .tanakh/alternatives/), else null
+// the kind named by its top-level `main` (make-tanakh-grammar: always "main"), else the kind `main`, else the one kind that is not an alternative (`alternatives`: the kinds under .tanakh/alternatives/), else null
 export function draftRun(runs, alternatives = []) {
   const d = runs && typeof runs.drafts === "object" && runs.drafts ? runs.drafts : null;
   if (!d) return null;
-  const pick = d.main || (() => { const k = Object.keys(d).filter((x) => !alternatives.includes(x)); return k.length === 1 ? d[k[0]] : null; })();
+  const pick = (typeof runs.main === "string" && d[runs.main]) || d.main || (() => { const k = Object.keys(d).filter((x) => !alternatives.includes(x)); return k.length === 1 ? d[k[0]] : null; })();
   return pick && typeof pick.run === "string" ? pick.run : null;
 }
 

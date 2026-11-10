@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { validate } from "../template/.github/check/validate.mjs";
+import { validate, joinPieces } from "../template/.github/check/validate.mjs";
 import { buildChapter, readChapter } from "../src/lib/chapter.js";
 import { applyBox } from "../src/lib/units.js";
 import { chapterFiles, files, A, B, C, D } from "./fixture.js";
@@ -101,6 +101,8 @@ test(".parts: derived, a verse hash per row (stale = a notice), one cell per tok
   assert.match(stale.notices.find((n) => /stale/.test(n.msg)).msg, /1 verse row/);
   assert.match(problems(repo(undefined, { "JOS/JOS_001.parts": "# parts: other\n" }))[0], /make-tanakh-parts\/1/);
   assert.match(problems(repo(undefined, { "JOS/JOS_002.parts": parts([]) }))[0], /without its text file/);
-  // with a tone piece: compared without marks
-  assert.deepEqual(P([`1:1\t${h("1:1", V1)}\t${cells(["Efter:stem|:tone:H@1:\u0301", ...good.slice(1)])}`]), []);
+  // a tone piece puts its marks back: Kuni Joshua 1:7 token 37 (make-tanakh-grammar's row)
+  assert.deepEqual(joinPieces("nø:stem|:tone:tone-proh@4:\u0300;2:\u1DC4|qav:s0:m:-qav:verb"), { word: "nø\u0300qa\u1DC4v".normalize("NFC") });
+  assert.match(joinPieces("nø:stem|:tone:x@9:\u0300|qav:s0").error, /outside the word/);
+  assert.match(P([`1:1\t${h("1:1", V1)}\t${cells(["Efter:stem|:tone:H@1:\u0301", ...good.slice(1)])}`])[0], /the pieces give "Efteŕ"/);
 });

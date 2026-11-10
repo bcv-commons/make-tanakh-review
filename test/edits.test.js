@@ -91,6 +91,8 @@ test("a save writes the rows beside the chapter, the status and its date; a merg
 
 test("draft: the main draft's run", () => {
   const d = (drafts) => ({ book: "JOS", chapter: 1, drafts });
+  assert.equal(draftRun({ ...d({ main: { run: "m1" }, nllb: { run: "n1" } }), main: "main" }), "m1");
+  assert.equal(draftRun({ ...d({ llm: { run: "l1" }, nllb: { run: "n1" } }), main: "llm" }), "l1");
   assert.equal(draftRun(d({ main: { run: "m1" }, llm: { run: "l1" } })), "m1");
   assert.equal(draftRun(d({ llm: { run: "l1" }, nllb: { run: "n1" }, shape: { run: "s1" } }), ["nllb", "shape"]), "l1");
   assert.equal(draftRun(d({ llm: { run: "l1" }, rules: { run: "r1" } }), []), null);       // which is the main draft? not said

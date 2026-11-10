@@ -197,7 +197,34 @@ export function validate(files, { keys = null, changed = null, author = null } =
 // does not match the verse is stale: a notice, not an error (the publisher rebuilds it).
 const PARTS_HEADER = /^# parts: make-tanakh-parts\/1;/;
 const SLOT = /^(whole|stem|[psi]\d+)$/;
-const bareOf = (x) => x.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
+
+// A cell's pieces joined, the tone marks put back: `:tone[:<label>]@<pos>:<mark>;<pos>:<mark>...` puts each mark on the pos-th
+// letter cluster (a base letter with its marks) from the whole word's end. Returns the word (NFC), or an error message.
+export function joinPieces(pieces) {
+  let joined = "";
+  const tones = [];
+  for (const p of pieces.split("|")) {
+    if (p.startsWith(":tone")) {
+      const at = p.indexOf("@");
+      if (at < 0) return { error: `cannot read the tone piece ${JSON.stringify(p)}` };
+      for (const e of p.slice(at + 1).split(";")) {
+        const m = /^@?(\d+):(\p{M}+)$/u.exec(e);
+        if (!m) return { error: `cannot read the tone piece ${JSON.stringify(p)}` };
+        tones.push([Number(m[1]), m[2]]);
+      }
+      continue;
+    }
+    const [txt, slot] = p.split(":");
+    if (!txt || !SLOT.test(slot || "")) return { error: `cannot read the piece ${JSON.stringify(p)}` };
+    joined += txt;
+  }
+  const clusters = joined.normalize("NFD").match(/\P{M}\p{M}*/gu) || [];
+  for (const [pos, mark] of tones) {
+    if (pos < 1 || pos > clusters.length) return { error: `the tone mark at ${pos} is outside the word (${clusters.length} letters)` };
+    clusters[clusters.length - pos] += mark;
+  }
+  return { word: clusters.join("").normalize("NFC") };
+}
 function checkParts(file, text, verses, err, notices) {
   const lines = text.split("\n");
   if (!PARTS_HEADER.test(lines[0] || "")) err(file, "the first line must be `# parts: make-tanakh-parts/1; splitter ...; unicode ...`", 1);
@@ -217,15 +244,10 @@ function checkParts(file, text, verses, err, notices) {
     cells.forEach((cell, t) => {
       const m = /^(\d+)=(.+)$/.exec(cell);
       if (!m || Number(m[1]) !== t) { err(file, `${ref}: cell ${t + 1} is not \`${t}=<pieces>\``, line); return; }
-      let joined = "", tone = false;
-      for (const p of m[2].split("|")) {
-        if (p.startsWith(":tone")) { tone = true; continue; }
-        const [txt, slot] = p.split(":");
-        if (!txt || !SLOT.test(slot || "")) { err(file, `${ref}: token ${t}: cannot read the piece ${JSON.stringify(p)}`, line); return; }
-        joined += txt;
-      }
-      const surface = s.slice(spans[t].start, spans[t].end), j = joined.normalize("NFC");
-      const ok = tone ? bareOf(j) === bareOf(surface) : j === surface.normalize("NFC") || j === toks[t].normalize("NFC");
+      const r = joinPieces(m[2]);
+      if (r.error) { err(file, `${ref}: token ${t}: ${r.error}`, line); return; }
+      const surface = s.slice(spans[t].start, spans[t].end), j = r.word;
+      const ok = j === surface.normalize("NFC") || j === toks[t].normalize("NFC");
       if (!ok) err(file, `${ref}: token ${t}: the pieces give ${JSON.stringify(j)}, the token is ${JSON.stringify(surface)}`, line);
     });
   });

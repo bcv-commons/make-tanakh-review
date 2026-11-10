@@ -233,8 +233,7 @@ the proposal is merged. One file per save, so two proposals never touch the same
   punctuation or spacing only. `AFFIX` is given by the drafting side at intake (it needs the word's parts).
 - `from_alt`: the alternative (section 9) whose words the reviewer put in the unit with "use", if any. `scope` is `this` (a
   question "only here, or for clauses like this?" may make it `similar`); `entry` a register entry, `draft` the run that made
-  the main draft (`.tanakh/runs/<BOOK>_<CCC>.json` `drafts.<kind>.run`, the kind `main`, else the one kind that is not an
-  alternative), `why` the reviewer's own words, all optional.
+  the main draft (`.tanakh/runs/<BOOK>_<CCC>.json` `drafts[main].run`), `why` the reviewer's own words, all optional.
 - Written by the editor only, never edited; the drafting side reads them at tagged revisions.
 
 ## 11. The language (`.tanakh/language.json`)
@@ -260,12 +259,15 @@ Written by the publisher beside a chapter (and beside an alternative), never edi
   rows stay valid.
 - Pieces, joined by `|`: `<text>:<slot>[:<morph id>]`, slot `whole`, `stem`, `p<n>`, `s<n>`, `i<n>` (prefix, suffix, infix by
   position); the morph id names a register entry. A tone piece `:tone[:<label>]@<pos>:<mark>;...` (pos in letters from the
-  word's end). The pieces' texts joined, the tone marks put back, give the token (NFC).
+  word's end). The pieces' texts joined, the tone marks put back, give the token (NFC). Tone positions count letter clusters (a
+  base letter with its marks) from the end of the whole word: `nø:stem|:tone:tone-proh@4:̀;2:᷄|qav:s0:m:-qav:verb` gives
+  `nø̀qa᷄v` (Kuni Joshua 1:7).
 
 ## 13. The drafting side's other files
 
-- `.tanakh/runs/<BOOK>_<CCC>.json`: `{ book, chapter, drafts: { <kind>: { run, label, model, prompts sha256, code, register,
-  built } } }`, which run made each draft (section 10's `draft`).
+- `.tanakh/runs/<BOOK>_<CCC>.json`: `{ book, chapter, main: "main", drafts: { <kind>: { run, label, model, prompts sha256,
+  code, register, built } } }`, which run made each draft; the main draft's kind is `main`, the others are the alternatives
+  (section 10's `draft` = `drafts[main].run`).
 - `.tanakh/clause-features.json`: a pointer, not values: the clause features "clauses like this" match on are in the CC BY-SA
   dataset bcv-commons/clause-columns, which never enters a language repo (CC0). The file names the dataset, its revision, the
   file and its SHA-256, the layout it is keyed by, the join (a `.units` key's part before `-` is the dataset's `clause_key`;

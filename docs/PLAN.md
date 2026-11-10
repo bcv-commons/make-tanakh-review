@@ -382,6 +382,9 @@ In detail (2026-11-03, as the code expects it):
   clause, continued" with the first piece's words; it now shows the piece's own words and which clause it continues. Checked
   that nothing else assumes a key once per verse or one span per clause (agreement unites the pieces; edit rows name
   `key/2`). Not used yet: the tree (`parent_key`, `depth`) for indenting inner clauses.
+  Their answer: `.tanakh/runs/` has a top-level `"main": "main"` (the main draft's kind is always `main`), read so; tone
+  pieces are now checked exactly (marks put back on letter clusters counted from the word's end; their Kuni Joshua 1:7 row
+  is a test).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
