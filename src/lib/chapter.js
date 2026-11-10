@@ -194,3 +194,43 @@ export function mergeChapter(base, ours, theirs, choices = null) {
   }
   return { files, conflicts };
 }
+
+// ---- the chapter's status (FORMAT.md section 1: `status:` with fixed keys, values JSON strings; labels in `status_labels`)
+export const STATUS_KEYS = ["maturity", "translation", "exegesis", "literary", "date"];
+
+// { keys: [...], values: { key: "..." }, labels: [...] } from the front matter lines
+export function readStatus(front) {
+  const values = {}, keys = [];
+  let inStatus = false, labels = [];
+  for (const l of front || []) {
+    if (/^status:\s*$/.test(l)) { inStatus = true; continue; }
+    const m = inStatus && /^\s+([A-Za-z_]+):\s*(.*)$/.exec(l);
+    if (m) { keys.push(m[1]); try { values[m[1]] = JSON.parse(m[2]); } catch { values[m[1]] = m[2]; } continue; }
+    inStatus = false;
+    const lab = /^status_labels:\s*(\[.*\])\s*$/.exec(l);
+    if (lab) { try { labels = JSON.parse(lab[1]); } catch { /* as it is */ } }
+  }
+  return { keys, values, labels };
+}
+
+// The front matter with new status values (only keys it has, or the fixed ones), and the date of this version set to `today`
+// in the form the file already uses (17.08.2026 or 2026-08-17). Returns the new lines.
+export function setStatus(front, values, today = null) {
+  const out = [...front];
+  let start = out.findIndex((l) => /^status:\s*$/.test(l));
+  if (start < 0) { out.push("status:"); start = out.length - 1; }
+  let end = start + 1;
+  while (end < out.length && /^\s+[A-Za-z_]+:/.test(out[end])) end++;
+  const set = (k, v) => {
+    const i = out.slice(start + 1, end).findIndex((l) => new RegExp(`^\\s+${k}:`).test(l));
+    if (i >= 0) out[start + 1 + i] = `  ${k}: ${JSON.stringify(v)}`;
+    else { out.splice(end, 0, `  ${k}: ${JSON.stringify(v)}`); end++; }
+  };
+  for (const [k, v] of Object.entries(values || {})) if (STATUS_KEYS.includes(k) && typeof v === "string") set(k, v.replace(/\s+/g, " ").trim());
+  if (today) {
+    const old = readStatus(out).values.date || "";
+    const d = String(today.getUTCDate()).padStart(2, "0"), m = String(today.getUTCMonth() + 1).padStart(2, "0"), y = today.getUTCFullYear();
+    set("date", /^\d{4}-\d{2}-\d{2}$/.test(old) ? `${y}-${m}-${d}` : `${d}.${m}.${y}`);
+  }
+  return out;
+}

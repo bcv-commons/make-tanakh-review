@@ -359,6 +359,20 @@ In detail (2026-11-03, as the code expects it):
   "drog op") are the aligner linking one word only; they are looking at joining an adjacent particle in the span extension.
   **2026-11-10: pinned at commit 6f169dba** (their build a9440e0af181): Danish `function` 693 lexemes, עֶבֶד, Moses, יהוה,
   היה no longer in it; the verb + particle splits are unchanged so far.
+- **2026-11-10: the data back to the drafting side (make-tanakh-grammar's redesign; formats agreed the same day).** Their
+  plan: every reviewer change comes back as structured data (`.edits`), with `.parts` and `.feats` from them, a register of the
+  team's language knowledge, `.tanakh/runs/`, tags `register-<n>` they take in. Agreed on our proposal: `.parts`/`.feats` are
+  derived (`.parts` hashed per verse row, stale = a notice; `.feats` keyed by the Hebrew clause, no text hash); one edits file
+  per save; one file per register entry (`.tanakh/register/<kind>/<slug>-<6 hex of sha256(id)>.json`), decisions as merged
+  PRs; one edit row per change in a save's diff, conflict choices as rows. The status: the user decided anyone signed in
+  changes it in a proposal (reviewed like the text) and the save sets the date; their "only the team edits it" means people,
+  not the machine (they never overwrite a status people set). Built: `src/lib/edits.js` and the save writing
+  `.tanakh/edits/<BOOK>/<BOOK>_<CCC>/<time>-<login>.jsonl` (FORMAT.md section 10; `mergePR` lets these through); the "use"
+  presses sent with the save (`from_alt`); conflict choices as `CHOICE` rows; the status editable above the title, the date set
+  on save; `.tanakh/language.json` (section 11; the text box's `lang`, the names in the menus; `init_language.sh` writes it);
+  `.tanakh/publisher.json` shown as who made the drafts; CI: the edit records' and language file's form, a notice when anyone
+  but the publisher's `login` touches derived files (`--author` from the workflow). Not yet: `.parts`/`.feats` in the check
+  (their formats follow), per-token menus, the scope question, the register and answer boxes.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

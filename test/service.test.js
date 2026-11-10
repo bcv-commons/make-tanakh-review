@@ -90,10 +90,12 @@ for (const [kind, fresh] of Object.entries(STORES)) {
   test(`${kind}: a save writes only the files that changed, in one commit`, async () => {
     const { st } = await fresh();
     const changed = async () => st().changedFiles(await st().branchHead("main"), await st("ann").branchHead("edit/ann"));
-    await edit(st, "ann", 0, "Efter at Moses# var død,");                     // a re-cut: only the .units changes
-    assert.deepEqual(await changed(), ["JOS/JOS_001.units"]);
+    const chapterOnly = async () => (await changed()).filter((f) => !f.startsWith(".tanakh/edits/"));
+    await edit(st, "ann", 0, "Efter at Moses# var død,");                     // a re-cut: the .units, and the .md's date
+    assert.deepEqual(await chapterOnly(), ["JOS/JOS_001.md", "JOS/JOS_001.units"]);
+    assert.match((await changed())[0], /^\.tanakh\/edits\/JOS\/JOS_001\/\d{8}T\d{6}Z-ann\.jsonl$/);   // and the save's edit record
     await edit(st, "ann", 3, "Min tjener er nu død.");                         // a text edit: all four
-    assert.equal((await changed()).length, 4);
+    assert.equal((await chapterOnly()).length, 4);
     const d = await S.load(st("ann"), "ann", F);
     const r = await S.save(st("ann"), "ann", F, d.units, d.version);
     assert.equal(r.unchanged, true);

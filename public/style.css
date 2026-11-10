@@ -104,3 +104,9 @@ mark.check, .mirror mark.check { background: var(--check-bg); outline: 1px dashe
 @media (prefers-color-scheme: dark) { :root { --alt-nil: #5a2f20; --alt-some: #3a2a22; } }
 .mirror mark.alt-nil { background: var(--alt-nil); color: transparent; }
 .mirror mark.alt-some { background: var(--alt-some); color: transparent; }
+/* the chapter's status (FORMAT.md section 1) and who made the drafts */
+details.status { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+details.status summary { cursor: pointer; }
+.sgrid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; align-items: center; margin: 6px 0; max-width: 640px; }
+.sgrid input { width: 100%; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
+.sgrid input[readonly] { border-color: transparent; background: transparent; }

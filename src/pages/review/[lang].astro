@@ -3,9 +3,9 @@
 // working text differs from the approved one (team approves). Anyone can read this page.
 import Base from "../../layouts/Base.astro";
 import Nav from "../../components/Nav.astro";
-import { storeFor, LANG_NAMES } from "../../lib/config.js";
+import { storeFor, languageName, rememberLanguage } from "../../lib/config.js";
 import { currentUser } from "../../lib/session.js";
-import { proposal, awaitingApproval, roles } from "../../lib/service.js";
+import { proposal, awaitingApproval, roles, language } from "../../lib/service.js";
 import { byVerse, atoms } from "../../lib/units.js";
 const { lang } = Astro.params;
 const user = await currentUser(Astro.cookies);
@@ -22,7 +22,8 @@ const verseDiff = (before, after, verses) => {
   const B = byVerse(label(before)), A = byVerse(label(after));
   return verses.map((r) => ({ ref: r, before: B.get(r) || [], after: A.get(r) || [] }));
 };
-const name = LANG_NAMES[lang] || lang;
+rememberLanguage(lang, await language(store));
+const name = languageName(lang);
 ---
 <Base title={`Review (${name})`}>
   <Nav slot="nav" lang={lang} page="review" />

@@ -69,7 +69,10 @@ test("the check: an alternative gets every chapter check and its own keys", () =
   assert.match(problems(repo({ ".tanakh/alternatives/nllb/notes.txt": "x" }))[0], /not a file of the alternative drafts/);
   assert.match(problems(repo({ ".tanakh/alternatives/README.md": "# none\n" }))[0], /no line "- `nllb`/);
   const n = validate(repo(), { keys: KEYS, changed: [`${base}.md`] }).notices;
-  assert.ok(n.some((x) => /changes the alternative drafts .*only the publisher/.test(x.msg)));
+  assert.ok(n.some((x) => /changes derived files .*only the publisher/.test(x.msg)));
+  const pub = repo({ ".tanakh/publisher.json": JSON.stringify({ name: "make-tanakh-grammar", login: "mtg-bot" }) });
+  assert.ok(!validate(pub, { keys: KEYS, changed: [`${base}.md`], author: "mtg-bot" }).notices.some((x) => /derived/.test(x.msg)));
+  assert.match(validate(pub, { keys: KEYS, changed: [`${base}.md`, "JOS/JOS_001.parts"], author: "ann" }).notices.find((x) => /derived/.test(x.msg)).msg, /by ann .*\(2: .*publisher \(mtg-bot\)/);
   assert.ok(!n.some((x) => /github\.com/.test(x.msg)));
 });
 

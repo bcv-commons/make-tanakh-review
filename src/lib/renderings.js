@@ -5,7 +5,7 @@ import { tokenSpans } from "./format.js";
 import { ordinals } from "./poetry.js";
 
 // ordinal -> token positions, of one .align field ("0:3 1:2-3 2:4,6 !5 +7 ...")
-function links(field) {
+export function links(field) {
   const out = new Map();
   for (const it of (field || "").split(" ")) {
     const m = /^(\d+):([\d,-]+)$/.exec(it);

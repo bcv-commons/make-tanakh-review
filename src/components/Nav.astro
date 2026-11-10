@@ -1,6 +1,6 @@
 ---
 // The top-bar navigation: language, book and chapter menus, previous / next chapter, and the review page with its count.
-import { languages, storeFor, LANG_NAMES } from "../lib/config.js";
+import { languages, storeFor, languageName } from "../lib/config.js";
 import { chapters } from "../lib/service.js";
 const { lang, book = null, ch = null, page = "edit" } = Astro.props;
 const store = await storeFor(lang);
@@ -17,7 +17,7 @@ const open = (await store.listPRs()).filter((p) => p.status === "open" || p.stat
 ---
 <nav class="nav" data-first={JSON.stringify(first)}>
   <select aria-label="Language" data-go="lang">
-    {langs.map((l) => <option value={`/edit/${l}`} selected={l === lang}>{LANG_NAMES[l] || l}</option>)}
+    {langs.map((l) => <option value={`/edit/${l}`} selected={l === lang}>{languageName(l)}</option>)}
   </select>
   <select aria-label="Book" data-go="book">
     {books.map((b) => <option value={b} selected={b === cur}>{b}</option>)}

@@ -7,5 +7,13 @@
 - `layout.json`: the pinned layouts (hebrew-clause-layout, greek-nt-clause-layout, revisions) and the MACULA spine release the
   clause keys come from. `migrations/`: one key map per layout upgrade (none yet).
 
-These files are copied from the template when a language repository is created and updated by the bot; people do not
+Per language repository (FORMAT.md):
+
+- `language.json`: the language's code, name and tag (section 11), written when the repository is made.
+- `publisher.json`: who makes the drafts (the drafting side writes it; the editor shows it, CI names its `login`).
+- `glosses.json`: the commonest renderings per Hebrew lexeme (section 8), from the drafting side.
+- `alternatives/`: other drafts of the chapters (section 9), from the drafting side, never edited.
+- `edits/`: the edit records of every save (section 10), written by the editor with the save; never edited by hand.
+
+The shared files above are copied from the template when a language repository is created and updated by the bot; people do not
 edit them.

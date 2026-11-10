@@ -35,6 +35,14 @@ export const githubFetch = () => http;
 
 export const DATA = process.env.MTR_DATA || path.resolve(".local");
 export const LANG_NAMES = { dan: "Danish" };
+const LANG_TAGS = { dan: "da" };
+
+// A language's name and tag: the repo's `.tanakh/language.json` (FORMAT.md section 11) as last read, else the table above, else
+// the code. Pages that read the file tell it here (rememberLanguage), so the menus of other pages use it too.
+const langInfo = new Map();
+export function rememberLanguage(lang, info) { if (info && typeof info === "object") langInfo.set(lang, info); }
+export const languageName = (lang) => langInfo.get(lang)?.name || LANG_NAMES[lang] || lang;
+export const languageTag = (lang) => langInfo.get(lang)?.bcp47 || LANG_TAGS[lang] || lang;
 
 // Tanakh books in the order of the English Bible (the drafts' order); used to sort books in menus
 export const BOOK_ORDER = ["GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT", "1SA", "2SA", "1KI", "2KI", "1CH", "2CH", "EZR", "NEH",

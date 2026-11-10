@@ -55,6 +55,9 @@ jobs:
         run: git diff --name-only "$BASE" HEAD > "$RUNNER_TEMP/changed.txt"
 
       - name: check the chapters
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           if [ -f "$RUNNER_TEMP/changed.txt" ]; then changed="--changed $RUNNER_TEMP/changed.txt"; fi
-          node .github/check/validate.mjs . --keys "$RUNNER_TEMP/keys.json" $changed
+          if [ -n "$AUTHOR" ]; then author="--author $AUTHOR"; fi
+          node .github/check/validate.mjs . --keys "$RUNNER_TEMP/keys.json" $changed $author

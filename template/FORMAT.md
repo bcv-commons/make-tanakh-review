@@ -27,7 +27,9 @@ status_labels: ["Modenhed", "Oversættelse", "Eksegetisk bearbejdning", "Litter�
 
 - **Front matter** (YAML between `---` lines): `book`, `chapter`, and the chapter's status fields under `status` with fixed
   keys (`maturity`, `translation`, `exegesis`, `literary`, `date`) and their labels in the language under `status_labels`.
-  Values are JSON strings. Other keys may follow; the editor shows them as they are.
+  Values are JSON strings. Other keys may follow; the editor shows them as they are. People change the status in the editor,
+  in their proposal like the text; every save sets `date` to the day of the save, in the form the file uses (`17.08.2026` or
+  `2026-08-17`). The drafting side writes its machine status only on chapters without a status from people.
 - **`# title`**: the chapter title, one line. **`## heading`**: a section heading; it stands before the verse line it precedes.
 - **Verse lines**: `chapter:verse<TAB>text`, one verse per line, in ascending order, translatable text only: no verse
   markers, no notes, no line-break marks. A verse without text has an empty text field. Verse numbers follow the Hebrew
@@ -125,6 +127,10 @@ exactly where the word's rendering begins: 97.6% of the 24,329 lines), `in` or `
 - Alternative drafts (section 9) get every check above, and: `alternative:` equal to the folder's kind, `built:` a date,
   `# units: authored`, all four files present, a README line per kind, no other file under `.tanakh/alternatives/`. A pull
   request that touches them gets a notice (only the publisher writes them). `layout_keys.py` takes their books too.
+- Derived files (the alternatives, `.tanakh/runs/`, `.parts`, `.feats`): a pull request by anyone but the publisher
+  (`.tanakh/publisher.json` `login`) that touches them gets a notice.
+- Edit records (section 10): the file name, each line a JSON object, `who` the file's login, `op`, `cat` and `scope` from the
+  lists, `ref` a verse of the chapter. `.tanakh/language.json` (section 11): its three keys.
 
 ## 7. Derived formats
 
@@ -196,3 +202,39 @@ only, and shades the main text's words by how many of them have the word.
   Membership is exact after step 1: another wording of the same meaning is no support. Repeated tokens are checked each on
   its own (a set, not counts). Nothing crosses a verse. After an edit the shading compares the reviewer's wording.
 
+## 10. Edit records: what reviewers changed (`.tanakh/edits/`, decided with make-tanakh-grammar 2026-11-10)
+
+Every save in the editor writes, in the same commit as the chapter, one file of rows describing the save's changes against the
+text it started from, so the drafting side can learn from them. The file travels in the proposal and reaches `main` only when
+the proposal is merged. One file per save, so two proposals never touch the same file:
+
+```
+.tanakh/edits/<BOOK>/<BOOK>_<CCC>/<yyyymmddThhmmssZ>-<login>.jsonl
+{"ref":"1:1","unit":"060010010071-060010010141","who":"ann","when":"2026-11-10T08:15:30.123Z","scope":"this","entry":null,
+ "draft":null,"why":null,"commit":"<the commit edited>","op":"R","cat":"NEW","span":{"old":[5,6],"new":[5,6]},"old":"sagde",
+ "new":"talte","quote":{"prefix":"Moses var død","suffix":"HERREN til Josva"},"from_alt":null}
+```
+
+- One row per changed stretch of a verse, by the longest common subsequence of the tokens' surfaces (the text a token covers,
+  combining marks included). `span`: token positions `[from, to)` in the old and the new verse; `old`, `new`: the text they
+  cover; `quote`: up to three tokens before and after in the new verse; `unit`: the unit (as `.units` writes it) that holds it.
+- `op` (ERRANT's): `M` words added, `U` words removed, `R` replaced, `WO` the same words in another order.
+- `cat`: `TONE` only combining marks differ; `SPELL` case, or a small edit distance (at most a quarter of the word, at least
+  1); `FUNC` the old words were a function word's rendering (the `.align` function links); `NEW` a word not known in the
+  language (the glosses' forms, the chapter's words); `WORD` another known word; `ORDER` (with `WO`); `SPLIT`, `JOIN` the clause
+  cut of the verse changed (`old`, `new`: the units' clauses, `|` between units); `CHOICE` a verse both sides changed, settled
+  by the author when bringing in the working text (`choice`: `ours` = their own, `theirs` = the working text); `OTHER`
+  punctuation or spacing only. `AFFIX` is given by the drafting side at intake (it needs the word's parts).
+- `from_alt`: the alternative (section 9) whose words the reviewer put in the unit with "use", if any. `scope` is `this` (a
+  question "only here, or for clauses like this?" may make it `similar`); `entry` a register entry, `draft` the run of the
+  draft (from `.tanakh/runs/`, when there is one), `why` the reviewer's own words, all optional.
+- Written by the editor only, never edited; the drafting side reads them at tagged revisions.
+
+## 11. The language (`.tanakh/language.json`)
+
+```json
+{ "code": "dan", "name": "Danish", "native": "dansk", "bcp47": "da" }
+```
+
+`code` the ISO 639-3 code (the repository's name); `name` in English; `native` optional; `bcp47` the tag for spell checking and
+fonts (the two-letter code where there is one). Written when the repository is made (`tools/init_language.sh`).

@@ -1,12 +1,15 @@
 // The checks of FORMAT.md section 6, run by .github/workflows/validate.yml on every pull request and every push to main and
 // approved. Validation only: it reads the repository and never writes a file.
 //
-//   node .github/check/validate.mjs <repo root> [--keys keys.json] [--changed changed.txt]
+//   node .github/check/validate.mjs <repo root> [--keys keys.json] [--changed changed.txt] [--author <login>]
 //
 // --keys: the clause keys of the pinned layout per verse (layout_keys.py); without it the keys are not checked (said once).
 // --changed: the files a pull request changes (one per line); files other than chapter files are named in a notice.
 // Alternative drafts (`.tanakh/alternatives/<kind>/<BOOK>/<BOOK>_<CCC>.*`, FORMAT.md section 9) are chapters too and get every
 // chapter check, plus their own front matter keys.
+// --author: the pull request's author; a pull request by anyone but the publisher (.tanakh/publisher.json `login`) that touches
+// the derived files (the alternatives, .tanakh/runs/, .parts, .feats) gets a notice.
+// The edit records (.tanakh/edits/, FORMAT.md section 10) and .tanakh/language.json (section 11) are checked for their form.
 // format.js and vendor/tokenize.js are copies of make-tanakh-review's src/lib/format.js and src/lib/vendor/tokenize.js (its
 // tests keep them identical); the tokeniser is the published reference of bcv-commons/compact-alignments.
 import crypto from "node:crypto";
@@ -21,6 +24,10 @@ import {
 const CHAPTER = /^([A-Z0-9]{3})\/\1_(\d{3})\.(md|units|notes|align)$/;
 const ALT = /^\.tanakh\/alternatives\/([a-z0-9-]+)\/([A-Z0-9]{3})\/\2_(\d{3})\.(md|units|notes|align)$/;
 const ALT_DIR = ".tanakh/alternatives/", ALT_README = `${ALT_DIR}README.md`;
+const EDITS = /^\.tanakh\/edits\/([A-Z0-9]{3})\/\1_(\d{3})\/(\d{8}T\d{6}Z)-([A-Za-z0-9-]+)\.jsonl$/;
+const EDIT_OPS = new Set(["M", "R", "U", "WO"]);
+const EDIT_CATS = new Set(["SPELL", "TONE", "AFFIX", "FUNC", "WORD", "NEW", "ORDER", "SPLIT", "JOIN", "CHOICE", "OTHER"]);
+const DERIVED = (p) => p.startsWith(ALT_DIR) || p.startsWith(".tanakh/runs/") || /\.(parts|feats)$/.test(p);
 const BOOK_DIR = /^[A-Z0-9]{3}\//;
 const SIDECARS = ["units", "notes", "align"];
 const NOTE_KINDS = new Set(["T", "E", "H", "N"]);
@@ -43,7 +50,7 @@ const lineOf = (text, prefix) => { const i = text.split("\n").findIndex((l) => l
 
 // files: Map(path -> text). keys: { BOOK: { "c:v": ["first-last", "first-last/2", ...] } } or null. changed: [path] or null.
 // Returns { errors: [{ file, line, msg }], notices: [{ file, msg }], chapters }.
-export function validate(files, { keys = null, changed = null } = {}) {
+export function validate(files, { keys = null, changed = null, author = null } = {}) {
   const errors = [], notices = [];
   const err = (file, msg, line) => errors.push({ file, line, msg });
   const chapters = new Map();
@@ -52,6 +59,8 @@ export function validate(files, { keys = null, changed = null } = {}) {
     for (const [re, what] of SECRETS) if (re.test(text)) err(file, `looks like ${what}: never commit secrets`, lineOf(text, text.split("\n").find((l) => re.test(l))));
     const a = ALT.exec(file);
     if (a) { const base = file.replace(/\.\w+$/, ""); if (!chapters.has(base)) chapters.set(base, { book: a[2], ch: Number(a[3]), alt: a[1] }); chapters.get(base)[a[4]] = text; continue; }
+    if (file.startsWith(".tanakh/edits/")) { checkEdits(file, text, err); continue; }
+    if (file === ".tanakh/language.json") { checkLanguage(file, text, err); continue; }
     if (file.startsWith(ALT_DIR)) { if (file !== ALT_README) err(file, "not a file of the alternative drafts: .tanakh/alternatives/ holds README.md and <kind>/<BOOK>/<BOOK>_<CCC>.md, .units, .notes, .align (FORMAT.md section 9)"); continue; }
     const m = CHAPTER.exec(file);
     if (m) { const base = file.replace(/\.\w+$/, ""); if (!chapters.has(base)) chapters.set(base, { book: m[1], ch: Number(m[2]) }); chapters.get(base)[m[3]] = text; continue; }
@@ -170,12 +179,43 @@ export function validate(files, { keys = null, changed = null } = {}) {
   for (const b of unchecked) notices.push({ file: b, msg: `${b}: not in the pinned Hebrew layout, its clause keys are not checked` });
 
   if (changed) {
-    const alts = changed.filter((p) => p && p.startsWith(ALT_DIR));
-    if (alts.length) notices.push({ file: "", msg: `this pull request changes the alternative drafts (${alts.length} files under ${ALT_DIR}): only the publisher writes them, they are never edited` });
-    const other = changed.filter((p) => p && !CHAPTER.test(p) && !p.startsWith(ALT_DIR));
+    let pub = null;
+    try { pub = JSON.parse(files.get(".tanakh/publisher.json") || "null")?.login || null; } catch { /* no publisher named */ }
+    const derived = changed.filter((p) => p && DERIVED(p));
+    if (derived.length && !(author && pub && author === pub))
+      notices.push({ file: "", msg: `this pull request${author ? ` by ${author}` : ""} changes derived files (${derived.length}: the alternatives, .tanakh/runs/, .parts, .feats): only the publisher${pub ? ` (${pub})` : ""} writes them, they are never edited` });
+    const other = changed.filter((p) => p && !CHAPTER.test(p) && !DERIVED(p) && !EDITS.test(p));
     if (other.length) notices.push({ file: "", msg: `this pull request changes files other than chapter files (${other.join(", ")}): it is merged on github.com, not in the editor` });
   }
   return { errors, notices, chapters: chapters.size };
+}
+
+// One edit record file: its name, and each line a JSON object with the agreed fields (FORMAT.md section 10)
+function checkEdits(file, text, err) {
+  const m = EDITS.exec(file);
+  if (!m) { err(file, "not an edit record: .tanakh/edits/<BOOK>/<BOOK>_<CCC>/<yyyymmddThhmmssZ>-<login>.jsonl (FORMAT.md section 10)"); return; }
+  text.split("\n").forEach((l, i) => {
+    if (!l.trim()) return;
+    let r;
+    try { r = JSON.parse(l); } catch { err(file, "not a JSON line", i + 1); return; }
+    if (!r || typeof r !== "object" || Array.isArray(r)) { err(file, "a row is a JSON object", i + 1); return; }
+    if (typeof r.ref !== "string" || !new RegExp(`^${Number(m[2])}:\\d+$`).test(r.ref)) err(file, `ref ${JSON.stringify(r.ref)} is not a verse of chapter ${Number(m[2])}`, i + 1);
+    if (r.who !== m[4]) err(file, `who ${JSON.stringify(r.who)} is not the file's login ${m[4]}`, i + 1);
+    if (!EDIT_OPS.has(r.op)) err(file, `op ${JSON.stringify(r.op)} is not M, R, U or WO`, i + 1);
+    if (!EDIT_CATS.has(r.cat)) err(file, `cat ${JSON.stringify(r.cat)} is not one of ${[...EDIT_CATS].join(" ")}`, i + 1);
+    if (typeof r.when !== "string" || Number.isNaN(Date.parse(r.when))) err(file, "when is not a time", i + 1);
+    if (r.scope !== undefined && !["this", "similar"].includes(r.scope)) err(file, `scope ${JSON.stringify(r.scope)} is not this or similar`, i + 1);
+  });
+}
+
+// .tanakh/language.json: { code, name, native?, bcp47 }
+function checkLanguage(file, text, err) {
+  let j;
+  try { j = JSON.parse(text); } catch { err(file, "not JSON"); return; }
+  if (!j || typeof j !== "object") { err(file, "an object { code, name, native, bcp47 }"); return; }
+  if (!/^[a-z]{3}$/.test(j.code || "")) err(file, "code: the ISO 639-3 code (three letters), as the repository is named");
+  if (typeof j.name !== "string" || !j.name.trim()) err(file, "name: the language's name in English");
+  try { if (typeof j.bcp47 !== "string" || Intl.getCanonicalLocales(j.bcp47).length !== 1) throw 0; } catch { err(file, "bcp47: the language tag for spell checking and fonts (da, kse, ...)"); }
 }
 
 // ---- the command line
@@ -204,7 +244,7 @@ function main(argv) {
   }
   const keys = opt("--keys") ? JSON.parse(fs.readFileSync(opt("--keys"), "utf8")) : null;
   const changed = opt("--changed") ? fs.readFileSync(opt("--changed"), "utf8").split("\n").filter(Boolean) : null;
-  const { errors, notices, chapters } = validate(files, { keys, changed });
+  const { errors, notices, chapters } = validate(files, { keys, changed, author: opt("--author") });
   const gh = !!process.env.GITHUB_ACTIONS, esc = (s) => String(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
   for (const n of notices) console.log(gh ? `::notice${n.file ? ` file=${n.file}` : ""}::${esc(n.msg)}` : `notice: ${n.file ? `${n.file}: ` : ""}${n.msg}`);
   for (const e of errors) console.log(gh ? `::error file=${e.file}${e.line ? `,line=${e.line}` : ""}::${esc(e.msg)}` : `${e.file}${e.line ? `:${e.line}` : ""}: ${e.msg}`);

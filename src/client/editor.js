@@ -28,7 +28,7 @@ export function start(data) {
   const g = localGet("mtr-glosses", "da");
   const a = localGet("mtr-alts", "all");
   S = { ...data, glossTable: data.glosses, dirty: false, glosses: g === "en" || g === "0" ? g : "da", msg: "", err: false,
-    alts: ["all", "shade", "off"].includes(a) ? a : "all", undo: null };
+    alts: ["all", "shade", "off"].includes(a) ? a : "all", undo: null, uses: [], statusEdits: {} };
   S.mainSigs = new Map([...byVerse(S.main)].map(([r, l]) => [r, new Set(l.map(sig))]));
   S.mainVerse = new Map([...byVerse(S.main)].map(([r, l]) => [r, JSON.stringify(l.map(sig))]));
   S.savedText = verseTexts(S.units);
@@ -138,6 +138,7 @@ function render(focus = null, caret = null) {
   const root = $("#editor");
   root.replaceChildren();
   const labels = atoms(S.units);
+  root.append(statusBlock());
   if (S.title) root.append(el("h2", { class: "ctitle" }, S.title));
   let verse = null, block = null, seen = null;
   const blocks = [];
@@ -154,7 +155,7 @@ function render(focus = null, caret = null) {
       blocks.push([verse, block]);
     }
     const changed = !(S.mainSigs.get(u.ref) || new Set()).has(sig(u));
-    const ta = el("textarea", { class: "u", rows: 1, readonly: !canEdit(), "data-i": i, spellcheck: "true", lang: "da" });
+    const ta = el("textarea", { class: "u", rows: 1, readonly: !canEdit(), "data-i": i, spellcheck: "true", lang: S.langTag || S.lang });
     ta.value = toBox(u.text);
     ta.addEventListener("input", () => onInput(i, ta));
     const tools = canEdit() ? el("div", { class: "tools" },
@@ -215,8 +216,35 @@ function altsOf(i, u) {
   }));
 }
 
+// The chapter's status (FORMAT.md section 1), its labels in the language: edited like the text, in the proposal; the date of the
+// version is set by the save. Who made the drafts (.tanakh/publisher.json) below it.
+const STATUS_KEYS = ["maturity", "translation", "exegesis", "literary", "date"];
+function statusBlock() {
+  const st = S.status || { keys: [], values: {}, labels: [] };
+  const keys = [...new Set([...STATUS_KEYS, ...st.keys])];
+  const val = (k) => (k in S.statusEdits ? S.statusEdits[k] : st.values[k] ?? "");
+  const label = (k) => st.labels[STATUS_KEYS.indexOf(k)] || k;
+  const pub = S.publisher && (S.publisher.name || S.publisher.login);
+  const box = el("details", { class: "status" }, el("summary", {}, [val("maturity"), val("date")].filter(Boolean).join(" · ") || "Status",
+    Object.keys(S.statusEdits).length ? el("span", { class: "note" }, " (changed)") : null),
+    el("div", { class: "sgrid" }, keys.map((k) => [el("label", { for: `st-${k}` }, label(k)),
+      k === "date" ? el("span", { id: `st-${k}`, class: "muted", title: "Set to the day of the save" }, `${val(k) || "—"} (set when you save)`)
+        : el("input", { id: `st-${k}`, value: val(k), readonly: !canEdit(), oninput: (e) => {
+          S.statusEdits[k] = e.target.value; if (!S.dirty) { S.dirty = true; renderBar(); }
+        } })])),
+    pub ? el("div", { class: "muted pub" }, "Drafts made by ", S.publisher.url ? el("a", { href: S.publisher.url, rel: "noopener" }, pub) : pub) : null);
+  if (Object.keys(S.statusEdits).length) box.open = true;
+  return box;
+}
+
+const today = (old) => {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  return /^\d{4}-/.test(old || "") ? `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}` : `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+};
+
 function useAlt(i, kind, text) {
   const old = S.units[i].text;
+  S.uses.push({ ref: S.units[i].ref, bases: S.units[i].bases, kind });
   S.units = S.units.map((x, k) => (k === i ? { ...x, text } : x));
   S.dirty = true; S.undo = { i, text: old, kind, ref: S.units[i].ref };
   S.msg = "";
@@ -227,6 +255,7 @@ function undoUse() {
   const u = S.undo;
   if (!u || !S.units[u.i] || S.units[u.i].ref !== u.ref) { S.undo = null; renderBar(); return; }
   S.units = S.units.map((x, k) => (k === u.i ? { ...x, text: u.text } : x));
+  S.uses.pop();
   S.undo = null;
   render(u.i);
 }
@@ -270,9 +299,11 @@ async function save() {
   const empty = S.units.findIndex((u) => !u.text.trim());
   if (empty >= 0) { say(`Clause ${S.units[empty].ref} is empty: write something or join it with a neighbour.`, true); return; }
   say("Saving…");
-  const r = await post("/api/save", { lang: S.lang, file: S.file, units: S.units, version: S.version });
+  const r = await post("/api/save", { lang: S.lang, file: S.file, units: S.units, version: S.version, status: S.statusEdits, uses: S.uses });
   if (!r.ok) { say(r.error || `Not saved (${r.status}).`, true); return; }
-  S.version = r.version; S.dirty = false; S.undo = null;
+  S.version = r.version; S.dirty = false; S.undo = null; S.uses = [];
+  if (!r.unchanged && S.status) S.status = { ...S.status, values: { ...S.status.values, ...S.statusEdits, date: today(S.status.values.date) } };
+  S.statusEdits = {};
   for (const ref of Object.keys(S.verses || {})) if (verseTexts(S.units)[ref] !== S.savedText[ref]) S.verses[ref] = { ...S.verses[ref], profile: "s", stale: false };
   S.savedText = verseTexts(S.units);
   render();

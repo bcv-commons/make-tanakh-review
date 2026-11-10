@@ -5,7 +5,9 @@
 import { renderings, wordLexemes, chapterGlosses } from "./renderings.js";
 import { ALT_FILE, ALT_DIR, altPath, altUnits, readmeLines } from "./alternatives.js";
 import { changedVerses } from "./units.js";
-import { readChapter, buildChapter, mergeChapter, verseInfo, display, EXTS, sibling, chapterOf } from "./chapter.js";
+import { readChapter, buildChapter, mergeChapter, verseInfo, display, EXTS, sibling, chapterOf, readStatus, setStatus } from "./chapter.js";
+import { editRows, choiceRows, editsPath, jsonl, vocabulary, EDITS_DIR } from "./edits.js";
+import { parseMd, serializeMd } from "./format.js";
 import { StaleError } from "./store/errors.js";
 import { BOOK_ORDER } from "./config.js";
 import { chapterBreaks } from "./poetry.js";
@@ -68,7 +70,24 @@ export async function load(store, login, file, { index = null, glossFallback = n
     approved: unitsOf(await model(store, APPROVED, file)), verses: verseInfo(cur), ...display(cur), poetry: await poetry(store, branch, file, cur, index),
     renderings: cur.align && !cur.stale.align ? renderings(index, { book: file.slice(0, 3), verses: cur.verses, align: cur.align.rows }) : {},
     ...(await glosses(store, index, file, cur, glossFallback)),
-    alternatives: await alternatives(store, file) };
+    alternatives: await alternatives(store, file), status: readStatus(cur.md.front), language: await language(store),
+    publisher: await publisher(store) };
+}
+
+// The repo's own description of its language (`.tanakh/language.json`, FORMAT.md section 11): { code, name, native, bcp47 }, or null
+export async function language(store) {
+  const f = await store.readFile(MAIN, ".tanakh/language.json");
+  try { const j = f && JSON.parse(f.text); return j && typeof j === "object" ? j : null; } catch { return null; }
+}
+
+// Who makes the drafts (`.tanakh/publisher.json`, written by the drafting side): { name, login, url } as far as the file has them
+async function publisher(store) {
+  const f = await store.readFile(MAIN, ".tanakh/publisher.json");
+  let j = null;
+  try { j = f && JSON.parse(f.text); } catch { return null; }
+  if (!j || typeof j !== "object") return null;
+  const str = (x) => (typeof x === "string" && x.trim() ? x.trim() : null);
+  return { name: str(j.name), login: str(j.login), url: str(j.url) && /^https:\/\//.test(j.url) ? j.url.trim() : null };
 }
 
 // The chapter's alternative drafts on main (FORMAT.md section 9), read only: [{ kind, about, built, verses }] by kind, each with
@@ -127,9 +146,11 @@ async function poetry(store, branch, file, cur, index) {
   return chapterBreaks(entries, ch, index).breaks;
 }
 
-// Save a chapter as one commit on the user's branch (all four files, the text hashes recomputed); open the pull request at the
-// first save. `version` = the files' versions as loaded ({path: version}).
-export async function save(store, login, file, list, version, message) {
+// Save a chapter as one commit on the user's branch (all four files, the text hashes recomputed, the edit records of the save
+// beside them: edits.js); open the pull request at the first save. `version` = the files' versions as loaded ({path: version});
+// `status`: new status values ({ maturity: "..." }); `uses`: the "use" buttons pressed since the last save ([{ ref, bases, kind }]).
+// A save that changes anything sets the status date to today.
+export async function save(store, login, file, list, version, message, { status = null, uses = [], now = new Date() } = {}) {
   let pr = await openPR(store, login);
   const branch = userBranch(login);
   if (!pr) await store.setBranch(branch, await store.branchHead(MAIN));          // a new proposal starts from main
@@ -137,9 +158,19 @@ export async function save(store, login, file, list, version, message) {
   if (!cur) throw new Refused("No such chapter.", 404);
   const b = buildChapter(cur, list);
   if (b.error) throw new Refused(b.error);
+  const withFront = (md, f) => serializeMd({ ...parseMd(md), front: f(parseMd(md).front) });
+  if (status && Object.keys(status).length) b.files.md = withFront(b.files.md, (fr) => setStatus(fr, status));
+  if (Object.entries(b.files).every(([ext, text]) => text === cur.texts[ext])) return { pr, version: cur.versions, unchanged: true };
+  b.files.md = withFront(b.files.md, (fr) => setStatus(fr, {}, now));
   const files = {};
   for (const [ext, text] of Object.entries(b.files)) if (text !== cur.texts[ext]) files[sibling(file, ext)] = text;
-  if (!Object.keys(files).length) return { pr, version: cur.versions, unchanged: true };
+  const after = readChapter({ ...cur.texts, ...b.files });
+  const rows = editRows({ before: cur, after, who: login, when: now, uses: Array.isArray(uses) ? uses : [],
+    vocab: vocabulary(await glossTable(store), cur), commit: await store.branchHead(branch) });
+  if (rows.length) {
+    const p = editsPath(file, now, login), had = await store.readFile(branch, p);
+    files[p] = (had ? had.text : "") + jsonl(rows);
+  }
   const expect = Object.fromEntries(EXTS.map((ext) => [sibling(file, ext), (version || {})[sibling(file, ext)] ?? null]));
   let r;
   try {
@@ -201,7 +232,8 @@ async function mergeFiles(store, into, from, choices = null) {
 export async function mergePR(store, reviewer, number) {
   const pr = (await store.listPRs()).find((p) => p.number === number);
   if (!pr || !["open", "conflict"].includes(pr.status)) throw new Refused("No such open proposal.", 404);
-  const { out, conflicts, others } = await mergeFiles(store, MAIN, pr.branch);
+  const { out, conflicts, others: all } = await mergeFiles(store, MAIN, pr.branch);
+  const others = all.filter((f) => !f.startsWith(EDITS_DIR));       // the edit records are the editor's own (edits.js)
   if (others.length) throw new Refused(`This proposal changes files other than chapters (${others.join(", ")}): merge it on github.com.`, 409);
   if (conflicts.length) {
     await store.updatePR(number, { status: "conflict" });
@@ -219,6 +251,10 @@ export async function updateBranch(store, login, choices = null) {
   const first = await mergeFiles(store, pr.branch, MAIN);
   if (first.conflicts.length && !choices) return { conflicts: first.conflicts };
   const { out } = first.conflicts.length ? await mergeFiles(store, pr.branch, MAIN, choices) : first;
+  if (first.conflicts.length) {                                     // the author's choices are edit records too
+    const now = new Date(), commit = await store.branchHead(pr.branch);
+    for (const [f, rows] of Object.entries(choiceRows(first.conflicts, choices, { who: login, when: now, commit }))) out[editsPath(f, now, login)] = jsonl(rows);
+  }
   await store.commitMerge(pr.branch, MAIN, out, { message: `Bring in main`, coAuthor: login });
   await store.updatePR(pr.number, { status: "open" });
   return { conflicts: [], merged: true };

@@ -67,3 +67,19 @@ test("files: only chapter files in a book folder, no stray files, no secrets, no
   const n = validate(repo(), { keys: KEYS, changed: ["JOS/JOS_001.md", "README.md"] }).notices;
   assert.match(n.at(-1).msg, /README\.md.*github\.com/);
 });
+
+test("edit records and language.json: their form", () => {
+  const ok = { ref: "1:1", who: "ann", when: "2026-11-10T08:15:30.123Z", op: "R", cat: "WORD", scope: "this" };
+  const P = ".tanakh/edits/JOS/JOS_001/20261110T081530Z-ann.jsonl";
+  assert.deepEqual(problems(repo(undefined, { [P]: JSON.stringify(ok) + "\n", ".tanakh/language.json": '{"code":"dan","name":"Danish","native":"dansk","bcp47":"da"}' })), []);
+  const bad = (row) => problems(repo(undefined, { [P]: JSON.stringify({ ...ok, ...row }) + "\n" }));
+  assert.match(bad({ who: "bo" })[0], /not the file's login ann/);
+  assert.match(bad({ op: "X" })[0], /op "X"/);
+  assert.match(bad({ cat: "MAYBE" })[0], /cat "MAYBE"/);
+  assert.match(bad({ ref: "2:1" })[0], /not a verse of chapter 1/);
+  assert.match(problems(repo(undefined, { [P]: "{x\n" }))[0], /not a JSON line/);
+  assert.match(problems(repo(undefined, { ".tanakh/edits/JOS/x.jsonl": "" }))[0], /not an edit record/);
+  assert.match(problems(repo(undefined, { ".tanakh/language.json": '{"code":"da","name":"Danish","bcp47":"da"}' }))[0], /ISO 639-3/);
+  const n = validate(repo(), { keys: KEYS, changed: ["JOS/JOS_001.md", P] }).notices;
+  assert.ok(!n.some((x) => /github\.com/.test(x.msg)));                               // the editor's own records: no notice
+});
