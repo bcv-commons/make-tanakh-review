@@ -10,7 +10,7 @@ const { lang, book, ch } = Astro.params;
 const user = await currentUser(Astro.cookies);
 const store = await storeFor(lang, user);
 const file = store && /^[A-Z0-9]{3}$/.test(book) && /^\d{1,3}$/.test(ch) ? chapterPath(book, Number(ch)) : null;
-const d = file ? await load(store, user?.login, file, { index: sourceIndex(book), glossFallback: () => lexemeGlosses(lang) }) : null;
+const d = file ? await load(store, user?.login, file, { index: await sourceIndex(book), glossFallback: () => lexemeGlosses(lang) }) : null;
 if (!d) return new Response("No such chapter", { status: 404 });
 rememberLanguage(lang, d.language);
 Astro.cookies.set("mtr_last", `${lang}/${book}/${Number(ch)}`, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });

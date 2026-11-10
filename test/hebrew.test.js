@@ -45,3 +45,24 @@ test("hebrew: the pinned chapter with MACULA's glosses joined per word; kept; of
   assert.equal((await C.hebrew("RUT", 3)).chapter, 3);
   assert.deepEqual((await C.hebrew("../x", 1)).verses, {});
 });
+
+test("sourceIndex: compact-alignments' lists at the pinned revision; the lexeme lists optional; offline DATA/index", async () => {
+  const calls = [];
+  let down = false;
+  C.useFetch(async (url) => {
+    calls.push(url);
+    if (down) throw new Error("offline");
+    if (url.includes("_lexemes") || url.includes("_fn.json")) return new Response("no", { status: 404 });
+    return new Response(JSON.stringify({ "JON 1:1": ["320010010011"] }), { status: 200 });
+  });
+  const x = await C.sourceIndex("JON");
+  assert.deepEqual(x.keys, { "JON 1:1": ["320010010011"] });
+  assert.equal(x.lexemes, null);
+  assert.ok(calls.includes(`https://huggingface.co/datasets/bcv-commons/compact-alignments/resolve/${C.COMPACT_INDEX.revision}/_index/JON_fn_keys.json`));
+  down = true;
+  assert.equal(await C.sourceIndex("MIC"), null);                                      // offline, nothing local
+  fs.mkdirSync(path.join(data, "index"), { recursive: true });
+  for (const k of ["keys", "fn_keys"]) fs.writeFileSync(path.join(data, "index", `NAM_${k}.json`), JSON.stringify({ "NAM 1:1": [k] }));
+  assert.deepEqual((await C.sourceIndex("NAM")).fn, { "NAM 1:1": ["fn_keys"] });
+  assert.equal(await C.sourceIndex("MAT"), null);
+});

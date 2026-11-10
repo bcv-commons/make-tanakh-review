@@ -1,13 +1,13 @@
-// Fetch compact-alignments' source index (the per-verse lists of MACULA keys that the .align ordinals count, and the lexemes
+// Fetch compact-alignments' source index (for working without the network: the editor fetches it itself) (the per-verse lists of MACULA keys that the .align ordinals count, and the lexemes
 // of the same lists) for the poetry view (src/lib/poetry.js) and the glosses (src/lib/renderings.js) into $MTR_DATA/index (default .local/index), each file checked against the published _source.json.
 // Read-only side data, CC BY 4.0 (MACULA); never committed.
 //   node tools/fetch_index.mjs GEN JOS ...        (no books: every Hebrew book)
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { BOOK_ORDER } from "../src/lib/config.js";
+import { BOOK_ORDER, COMPACT_INDEX } from "../src/lib/config.js";
 
-const BASE = "https://huggingface.co/datasets/bcv-commons/compact-alignments/resolve/main/_index";
+const BASE = `https://huggingface.co/datasets/${COMPACT_INDEX.dataset}/resolve/${COMPACT_INDEX.revision}/_index`;   // the revision the editor pins
 const DIR = path.join(process.env.MTR_DATA || path.resolve(".local"), "index");
 const books = process.argv.slice(2).length ? process.argv.slice(2) : BOOK_ORDER;
 

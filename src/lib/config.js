@@ -154,18 +154,22 @@ export async function hebrew(book, chapter) {
 }
 
 // compact-alignments' source index of a book ({ keys, fn }: "BOOK c:v" -> [MACULA key, ...]; the .align ordinals count these
-// lists), fetched by tools/fetch_index.mjs into DATA/index; null when it is not there (the poetry view then shows only the
-// lines that begin a clause).
-const indexes = new Map();
-export function sourceIndex(book) {
-  if (!indexes.has(book)) {
-    try {
-      const read = (kind) => JSON.parse(fs.readFileSync(path.join(DATA, "index", `${book}_${kind}.json`), "utf8"));
-      const opt = (kind) => { try { return read(kind); } catch { return null; } };   // the lexeme lists (glosses): optional
-      indexes.set(book, { keys: read("keys"), fn: read("fn_keys"), lexemes: opt("lexemes"), fnLexemes: opt("fn") });
-    } catch { indexes.set(book, null); }
-  }
-  return indexes.get(book);
+// lists; lexemes and fnLexemes: the same lists' lexemes, for the glosses), at a pinned revision of the dataset (CC BY 4.0,
+// MACULA). Kept in memory and under DATA/compact-index/<revision>/ like the Hebrew; without the network the files fetched by
+// tools/fetch_index.mjs into DATA/index; null when the keys are not to be had (the poetry view then shows only the lines that
+// begin a clause). A book not in the index stays null.
+export const COMPACT_INDEX = { dataset: "bcv-commons/compact-alignments", revision: "115830822e155b5cce71f902481aa9092fa9670e" };
+export async function sourceIndex(book) {
+  if (!BOOK_ORDER.includes(book)) return null;
+  const R = COMPACT_INDEX;
+  const get = async (kind) => {
+    const name = `${book}_${kind}.json`;
+    const v = await keep(`compact-index/${R.revision}`, name, `https://huggingface.co/datasets/${R.dataset}/resolve/${R.revision}/_index/${name}`, JSON.parse);
+    if (v) return v;
+    try { return JSON.parse(fs.readFileSync(path.join(DATA, "index", name), "utf8")); } catch { return null; }
+  };
+  const [keys, fn, lexemes, fnLexemes] = await Promise.all(["keys", "fn_keys", "lexemes", "fn"].map(get));
+  return keys && fn ? { keys, fn, lexemes, fnLexemes } : null;   // the lexeme lists (glosses): optional
 }
 
 // The fallback glosses where a language repo has no `.tanakh/glosses.json` (FORMAT.md section 8): lexeme-aligner's commonest

@@ -401,6 +401,9 @@ In detail (2026-11-03, as the code expects it):
   MACULA Hebrew's own lowfat files (Clear-Bible/macula-hebrew at 47db250b, the `gloss` of its morphemes, the same values as
   the spine's): checked equal to the reference build on seven chapters (RUT 1, JOS 1, GEN 1, PSA 119, HOS 1, NEH 7, MAL 3).
   Both kept in memory and under `$MTR_DATA`; offline the local build. The editor's unrendered-word flag comes only from `.align`.
+  The source index (`config.sourceIndex`: the lists the `.align` ordinals count, and their lexemes) is fetched the same way,
+  from bcv-commons/compact-alignments at a pinned revision (11583082; its books' files unchanged from the copy fetched before;
+  `tools/fetch_index.mjs` now reads the same revision). With both, a deployed site needs no prepared files.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

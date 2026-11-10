@@ -62,7 +62,7 @@ Start over: `rm -rf .local/repos .local/state && sh tools/init_local.sh`. Stop t
 | `src/lib/edits.js` | the edit records of each save (`.tanakh/edits/`, FORMAT.md section 10): the token diff per verse, classified (SPELL, TONE, FUNC, WORD, NEW, ORDER, SPLIT, JOIN, CHOICE, OTHER) |
 | `src/lib/alternatives.js` | the other drafts of a chapter (`.tanakh/alternatives/`, FORMAT.md section 9): their words under each clause, and the agreement shading computed from the current text |
 | `src/lib/renderings.js` | the glosses under the Hebrew words: the draft's own rendering (`.align`) and the language's commonest renderings (`.tanakh/glosses.json`, FORMAT.md section 8; else lexeme-alignments' `top.json` at the revision pinned in `config.js`, cached in `$MTR_DATA/lexeme-glosses/`) |
-| `tools/fetch_index.mjs` | compact-alignments' source index into `$MTR_DATA/index` (the `.align` ordinals and their lexemes, for the poetry lines and the glosses) |
+| `tools/fetch_index.mjs` | compact-alignments' source index (the `.align` ordinals and their lexemes, for the poetry lines and the glosses) into `$MTR_DATA/index`, for working without the network; the editor fetches it itself at the revision pinned in `config.js` (kept in `$MTR_DATA/compact-index/`) |
 | `template/.github/` | the language repos' CI: `workflows/validate.yml` runs `check/validate.mjs` (FORMAT.md section 6) |
 | `src/lib/units.js` | the clause-unit model: `#` / `%`, labels, changed verses (browser and server) |
 | `src/lib/store/local-git.js` | the store: git plumbing, compare-and-swap refs, pull request records |
