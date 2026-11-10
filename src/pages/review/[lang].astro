@@ -10,19 +10,18 @@ import { byVerse, atoms } from "../../lib/units.js";
 const { lang } = Astro.params;
 const user = await currentUser(Astro.cookies);
 const store = await storeFor(lang, user);
+Object.assign(Astro.locals, { store, storeLang: lang });                  // the menu (Nav) reads through it too
 if (!store) return new Response("No such language", { status: 404 });
-const me = await roles(store, user?.login);
-const prs = await store.listPRs();
-const open = [];
-for (const p of prs.filter((p) => p.status === "open" || p.status === "conflict")) open.push({ ...p, files: await proposal(store, p) });
+// the parts of the page side by side (on GitHub each read is a request)
+const [me, prs, waiting, langInfo] = await Promise.all([roles(store, user?.login), store.listPRs(), awaitingApproval(store), language(store)]);
+const open = await Promise.all(prs.filter((p) => p.status === "open" || p.status === "conflict").map(async (p) => ({ ...p, files: await proposal(store, p) })));
 const done = prs.filter((p) => p.status === "merged" || p.status === "closed").slice(-10).reverse();
-const waiting = await awaitingApproval(store);
 const label = (list) => { const a = atoms(list); return list.map((u, i) => ({ ...u, label: a[i] })); };
 const verseDiff = (before, after, verses) => {
   const B = byVerse(label(before)), A = byVerse(label(after));
   return verses.map((r) => ({ ref: r, before: B.get(r) || [], after: A.get(r) || [] }));
 };
-rememberLanguage(lang, await language(store));
+rememberLanguage(lang, langInfo);
 const name = languageName(lang);
 ---
 <Base title={`Review (${name})`}>

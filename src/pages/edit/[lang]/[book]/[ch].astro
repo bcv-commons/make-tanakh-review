@@ -11,6 +11,7 @@ const user = await currentUser(Astro.cookies);
 // the Hebrew and the source index (the same for every language) are fetched beside the language repo's files
 const sideData = Promise.all([hebrew(book, Number(ch)), sourceIndex(book)]);
 const store = await storeFor(lang, user);
+Object.assign(Astro.locals, { store, storeLang: lang });                  // the menu (Nav) reads through it too
 const file = store && /^[A-Z0-9]{3}$/.test(book) && /^\d{1,3}$/.test(ch) ? chapterPath(book, Number(ch)) : null;
 const index = sideData.then(([, x]) => x);
 const d = file ? await load(store, user?.login, file, { index, glossFallback: () => lexemeGlosses(lang) }) : null;

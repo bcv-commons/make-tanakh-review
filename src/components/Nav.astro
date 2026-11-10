@@ -3,9 +3,9 @@
 import { languages, storeFor, languageName } from "../lib/config.js";
 import { chapters } from "../lib/service.js";
 const { lang, book = null, ch = null, page = "edit" } = Astro.props;
-const store = await storeFor(lang);
-const list = await chapters(store);
-const langs = await languages();
+// the page's store when it left one (Astro.locals.store: its branch heads and pull requests are already read), else a reader's
+const store = (Astro.locals.store && Astro.locals.storeLang === lang ? Astro.locals.store : null) || await storeFor(lang);
+const [list, langs, prs] = await Promise.all([chapters(store), languages(), store.listPRs()]);   // side by side
 const books = [...new Set(list.map((c) => c.book))];
 const cur = book || list[0]?.book;
 const inBook = list.filter((c) => c.book === cur);
@@ -13,7 +13,7 @@ const i = list.findIndex((c) => c.book === book && c.chapter === Number(ch));
 const prev = i > 0 ? list[i - 1] : null, next = i >= 0 && i < list.length - 1 ? list[i + 1] : null;
 const url = (c) => `/edit/${lang}/${c.book}/${c.chapter}`;
 const first = Object.fromEntries(books.map((b) => [b, url(list.find((c) => c.book === b))]));
-const open = (await store.listPRs()).filter((p) => p.status === "open" || p.status === "conflict").length;
+const open = prs.filter((p) => p.status === "open" || p.status === "conflict").length;
 ---
 <nav class="nav" data-first={JSON.stringify(first)}>
   <select aria-label="Language" data-go="lang">

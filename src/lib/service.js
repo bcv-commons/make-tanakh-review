@@ -204,13 +204,11 @@ async function changes(store, from, to) {
 // The proposal of a pull request, chapter by chapter: verses changed against the point it started from.
 export async function proposal(store, pr) {
   const base = await store.mergeBase(MAIN, pr.branch) || await store.branchHead(MAIN);
-  const out = [];
-  for (const f of (await changes(store, base, await store.branchHead(pr.branch))).chapters) {
-    const b = unitsOf(await model(store, null, f, base));
-    const ours = unitsOf(await model(store, pr.branch, f));
-    out.push({ file: f, base: b, proposed: ours, main: unitsOf(await model(store, MAIN, f)), verses: changedVerses(b, ours) });
-  }
-  return out;
+  const list = (await changes(store, base, await store.branchHead(pr.branch))).chapters;
+  return Promise.all(list.map(async (f) => {                       // the chapters side by side
+    const [b, ours, main] = (await Promise.all([model(store, null, f, base), model(store, pr.branch, f), model(store, MAIN, f)])).map(unitsOf);
+    return { file: f, base: b, proposed: ours, main, verses: changedVerses(b, ours) };
+  }));
 }
 
 // Merge `from` into `into`, chapter by chapter. Files outside the chapters: taken from `from` when `into` left them alone
@@ -302,12 +300,11 @@ export async function approve(store, login, file) {
 
 // Chapters whose working text differs from the approved one.
 export async function awaitingApproval(store) {
-  const a = await store.branchHead(APPROVED), m = await store.branchHead(MAIN);
+  const [a, m] = await Promise.all([store.branchHead(APPROVED), store.branchHead(MAIN)]);
   const differ = new Set(a && m ? (await changes(store, a, m)).chapters : []);
-  const out = [];
-  for (const c of (await chapters(store)).filter((c) => differ.has(c.path))) {
-    const m = unitsOf(await model(store, MAIN, c.path)), a = unitsOf(await model(store, APPROVED, c.path));
-    if (changedVerses(a, m).length) out.push({ ...c, verses: changedVerses(a, m), main: m, approved: a });
-  }
-  return out;
+  const list = await Promise.all((await chapters(store)).filter((c) => differ.has(c.path)).map(async (c) => {   // side by side
+    const [m, a] = (await Promise.all([model(store, MAIN, c.path), model(store, APPROVED, c.path)])).map(unitsOf);
+    return changedVerses(a, m).length ? { ...c, verses: changedVerses(a, m), main: m, approved: a } : null;
+  }));
+  return list.filter(Boolean);
 }
