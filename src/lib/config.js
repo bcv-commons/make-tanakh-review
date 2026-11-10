@@ -103,7 +103,7 @@ export function sourceIndex(book) {
 // lexeme-glosses/1, counts only, CC0), read at a pinned revision of the dataset (the files are rebuilt with each chain run).
 // Kept in memory, and under DATA/lexeme-glosses/<revision>/ where that can be written; a missing language is remembered,
 // a network failure is retried after ten minutes.
-export const LEXEME_GLOSSES = { dataset: "bcv-commons/lexeme-alignments", revision: "989959e3e09c860cda1434d34d7b8fc36e9c477b" };
+export const LEXEME_GLOSSES = { dataset: "bcv-commons/lexeme-alignments", revision: "6f169dba153fa6c1a67083bcfe24a81bba1c2857" };
 const tops = new Map();
 export async function lexemeGlosses(iso) {
   if (!/^[a-z]{3}$/.test(iso || "")) return null;

@@ -347,7 +347,7 @@ In detail (2026-11-03, as the code expects it):
   done: the per-token hover (the box lies over the shading); their offer of `main_text: <sha256>` in the front matter is
   left open (not needed while the shading compares the current text).
 - **2026-11-09: lexeme-aligner's `top.json` is live** for 1,807 languages and is the editor's fallback glosses where a repo has
-  no `.tanakh/glosses.json` (`config.lexemeGlosses`, pinned at commit 989959e3 of bcv-commons/lexeme-alignments; the hover
+  no `.tanakh/glosses.json` (`config.lexemeGlosses`, pinned at a commit of bcv-commons/lexeme-alignments (first 989959e3); the hover
   says which source). Danish: one edition (`dan_det`, older spelling: fader, Ægypten, Josua), 9,122 Hebrew lexemes. Against
   the stand-in from our drafts: the same top form for 57 % of content-word occurrences (75 % have our top form among theirs;
   most differences are inflection order and spelling), 79 % for function words. Their `function` list names content words
@@ -357,6 +357,8 @@ In detail (2026-11-03, as the code expects it):
   forced non-content in their chain); the next build lists it only when at least half are (Danish 791 -> 693). They will
   send the commit; the editor needs no change for it, only the pin in `config.js` moved. Verb + particle splits ("op" for
   "drog op") are the aligner linking one word only; they are looking at joining an adjacent particle in the span extension.
+  **2026-11-10: pinned at commit 6f169dba** (their build a9440e0af181): Danish `function` 693 lexemes, עֶבֶד, Moses, יהוה,
+  היה no longer in it; the verb + particle splits are unchanged so far.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
