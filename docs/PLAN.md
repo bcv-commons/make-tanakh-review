@@ -385,6 +385,13 @@ In detail (2026-11-03, as the code expects it):
   Their answer: `.tanakh/runs/` has a top-level `"main": "main"` (the main draft's kind is always `main`), read so; tone
   pieces are now checked exactly (marks put back on letter clusters counted from the word's end; their Kuni Joshua 1:7 row
   is a test).
+- **2026-11-10: the first language repos, global-tanakh/zin (Ruth 1) and kvg (Joshua 1)**, seeded by make-tanakh-grammar from
+  the template at 3cdd6be5. `validate` has not run there: no run and no check suite after three pushes each, though the
+  workflow is registered (at the first push), byte-identical to the template's, and Actions is enabled for all actions. Not
+  explained by the workflow (job `format` matches the ruleset; concurrency cancels runs, it does not prevent them; an org
+  policy would show as disabled in the repo's settings). The seed commits are unsigned, so they came by `git push`, not
+  through the API; the open question is that push's credential. The template's workflow gained `workflow_dispatch` (a run
+  by hand gives the check on a branch). The editor needs the App installed on global-tanakh (it is on `larsgson` only).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

@@ -7,6 +7,7 @@ on:
     branches: [main, approved]
   push:
     branches: [main, approved]
+  workflow_dispatch:                # by hand (Actions tab, or `gh workflow run validate --ref <branch>`): checks that branch
 
 permissions:
   contents: read
