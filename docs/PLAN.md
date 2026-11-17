@@ -411,6 +411,26 @@ In detail (2026-11-03, as the code expects it):
   Hebrew and the source index beside them, and GitHubStore shares a read already on its way (trees and blobs by sha, a
   branch head per request, the pull requests), so parallel reads fetch an object once. From here: about 6 s cold, about 1 s
   warm (two requests: the heads of main and approved). Netlify's secret scan skips the public settings (netlify.toml).
+  The review page and the menu likewise (the menu reuses the page's store): live 1.6-2.4 s per page on 2026-11-12, of which
+  about 0.7 s is Netlify itself; the rest is a chain of 3-4 dependent GitHub reads (head, tree, files). Left as is.
+- **2026-11-17: research's four ideas for the editor, checked (make-tanakh-grammar's internal notes; not built).** (1) A word
+  picker: per content word 5-8 candidates with their evidence, one click (keys 1-8, 0 to type, l for later); the right word is
+  on the list for 58-72 % of content words, the engine writes it for 28-41 %. It is our per-token menus, the scope question
+  and the register in one. A choice wider than "only here" becomes a register entry in the save's proposal (never a rewrite of
+  other chapters from the browser); the drafter applies it, the editor marks it elsewhere. (2) Several drafts per clause:
+  built (section 9 of FORMAT.md, the shading); missing the shape draft's source trace on hover and a "passed the verbatim
+  check" mark the editor requires before showing an alternative. (3) Review flags with their measured precision, shown only
+  at 0.5 or more ("negation lost (0.7)"), from a sidecar the drafter writes; our "check links" (right about a quarter of the
+  time) becomes a quiet note. (4) Their findings are flag kinds in the same file. **The user, 2026-11-17: word lists drawn
+  from a non-free NT (Kuni) may sit in a team's repo: counts only, no verse text, no references** (as 2026-11-04). Formats
+  proposed to them: `.choices` and `.flags` beside a chapter, register kind `lexicon`. Order: flags, then the picker, then
+  the trace. Checked the same day against grammar's list of 2026-11-10 (review-feedback-data-plan, section 6): done are the
+  typed edit records (1), the `.parts` check (5, not the register), the language from the repo, publisher.json and the
+  editable status (9). Open: per-word actions and hand links (2), scope -> rules (3; conditions from the CC BY columns of
+  hebrew-clause-layout v0.37.1 (kind, rule, force, speech, shape), so a rule never copies clause-columns' CC BY-SA values into
+  a repo), the register editor, questionnaire and inbox (4), word parts shown faintly (6), a "publish revision" tag (7). Not
+  needed: a splitter here (8; `.parts` is rebuilt at the drafting side's intake). New: "the source is wrong here", a row keyed
+  by the word or clause key for bcv-commons; a lexeme with no candidate is a typed word (NEW).
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 
