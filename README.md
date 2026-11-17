@@ -90,6 +90,7 @@ GitHub itself. The app uses it when the five `MTR_GITHUB_*` settings are set (`.
 | `setBranch`, `branchHead`, `mergeBase`, `changedFiles` | `POST/PATCH /git/refs`, `GET /git/ref`, `GET /compare/{a}...{b}` (merge base), the two trees compared |
 | `createPR`, `updatePR`, `listPRs` | `POST/GET /pulls` (open ones into main, the last ten closed), the `conflict` label, `PATCH` to close, a comment naming who merged or closed |
 | `roles()`, `setRoles()` | `roles.json` on main, written by the App |
+| `listTags(prefix)`, `createTag(name, sha)` | `GET /git/matching-refs/tags/{prefix}`, `POST /git/refs` (`refs/tags/…`, by the App; a name taken is refused): the team's `register-<n>` revisions |
 
 Tokens (PLAN.md 15.2 point 2): the user's own token opens their pull request (with the CC0 line in its body) and, if they can push
 to the language repo, writes their `edit/<login>` branch; the App's installation token (`appTokens`: minted from the App's private

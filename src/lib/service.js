@@ -11,6 +11,7 @@ import { parseMd, serializeMd } from "./format.js";
 import { StaleError } from "./store/errors.js";
 import { BOOK_ORDER } from "./config.js";
 import { chapterBreaks } from "./poetry.js";
+import { wordParts } from "./parts.js";
 
 export const MAIN = "main", APPROVED = "approved";
 export const userBranch = (login) => `edit/${login}`;
@@ -67,12 +68,13 @@ export async function load(store, login, file, { index = null, glossFallback = n
   const cur = await model(store, branch, file);
   if (!cur) return null;
   index = await index;                                              // may come as a promise: fetched beside the reads above
-  const [[main, approved, alts, lang, pub], poem, gl] = await Promise.all([later, poetry(store, branch, file, cur, index),
-    glosses(store, index, file, cur, glossFallback)]);
+  const [[main, approved, alts, lang, pub], poem, gl, parts] = await Promise.all([later, poetry(store, branch, file, cur, index),
+    glosses(store, index, file, cur, glossFallback), store.readFile(branch, sibling(file, "parts"))]);
   return { branch, pr, units: cur.list, version: cur.versions, main: unitsOf(main),
     approved: unitsOf(approved), verses: verseInfo(cur), ...display(cur), poetry: poem,
     renderings: cur.align && !cur.stale.align ? renderings(index, { book: file.slice(0, 3), verses: cur.verses, align: cur.align.rows }) : {},
-    ...gl, alternatives: alts, status: readStatus(cur.md.front), language: lang, publisher: pub };
+    ...gl, alternatives: alts.list, altsHeld: alts.held, status: readStatus(cur.md.front), language: lang, publisher: pub,
+    parts: wordParts(parts ? parts.text : null, cur.verses) };
 }
 
 // The run that made the chapter's main draft (`.tanakh/runs/<BOOK>_<CCC>.json`, from the drafting side; FORMAT.md section 10)
@@ -102,22 +104,33 @@ async function publisher(store) {
 
 // The chapter's alternative drafts on main (FORMAT.md section 9), read only: [{ kind, about, built, verses }] by kind, each with
 // its words per verse (alternatives.js altUnits). One whose units do not match its own text is left out.
+// Shown only when the draft passed the verbatim-copy screen against the team's text (FORMAT.md section 13: `screen` in
+// `.tanakh/runs/<BOOK>_<CCC>.json`, "passed" or "not needed"): { list, held: [kinds not shown for want of the mark] }.
+export const screened = (runs, kind) => {
+  const v = runs && runs.drafts && runs.drafts[kind] && runs.drafts[kind].screen && runs.drafts[kind].screen.verbatim;
+  return v === "passed" || v === "not needed";
+};
+
 async function alternatives(store, file) {
   const kinds = (await store.listFiles(MAIN, ALT_DIR)).map((f) => ALT_FILE.exec(f))
     .filter((m) => m && m[4] === "md" && `${m[2]}/${m[2]}_${m[3]}.md` === file).map((m) => m[1]).sort();
-  if (!kinds.length) return [];
-  const [readme, ...files] = await Promise.all([store.readFile(MAIN, `${ALT_DIR}README.md`),
+  if (!kinds.length) return { list: [], held: [] };
+  const [readme, runsFile, ...files] = await Promise.all([store.readFile(MAIN, `${ALT_DIR}README.md`),
+    store.readFile(MAIN, `.tanakh/runs/${file.split("/")[1].replace(/\.md$/, "")}.json`),
     ...kinds.flatMap((kind) => EXTS.map((ext) => store.readFile(MAIN, altPath(kind, file, ext))))]);   // side by side
+  let runs = null;
+  try { runs = runsFile && JSON.parse(runsFile.text); } catch { runs = null; }
   const about = readmeLines(readme?.text);
-  const out = [];
+  const out = [], held = [];
   for (const [k, kind] of kinds.entries()) {
+    if (!screened(runs, kind)) { held.push(kind); continue; }
     const texts = Object.fromEntries(EXTS.map((ext, i) => [ext, files[k * EXTS.length + i]?.text ?? null]));
     const ch = readChapter(texts);
     if (!ch || ch.stale.units) continue;
     const built = /^built:\s*"?([\d-]+)"?\s*$/.exec((ch.md.front || []).find((l) => l.startsWith("built:")) || "");
     out.push({ kind, about: about[kind] || kind, built: built ? built[1] : null, verses: altUnits(ch.verses, ch.units.verses) });
   }
-  return out;
+  return { list: out, held };
 }
 
 // The chapter's glosses (FORMAT.md section 8): the repo's own `.tanakh/glosses.json` (counted from its drafts), else the
@@ -296,6 +309,30 @@ export async function approve(store, login, file) {
   if (!Object.keys(files).length) return { unchanged: true };
   await store.writeFiles(APPROVED, files, { message: `Approve ${file.replace(/\.md$/, "")}`, coAuthor: login, expect: a.versions });
   return { approved: true };
+}
+
+// The revisions published for the drafting side to take in (make-tanakh-grammar, 2026-11-10): tags `register-<n>` on main,
+// newest first: [{ name, n, sha }].
+export const REVISION_TAG = /^register-(\d+)$/;
+export async function revisions(store) {
+  return (await store.listTags("register-")).map((t) => ({ ...t, m: REVISION_TAG.exec(t.name) })).filter((t) => t.m)
+    .map(({ name, sha, m }) => ({ name, sha, n: Number(m[1]) })).sort((a, b) => b.n - a.n);
+}
+
+// "Publish revision" (the team): tag main's head `register-<n+1>`; nothing when the newest tag is already there.
+export async function publishRevision(store, login) {
+  if (!(await roles(store, login)).team) throw new Refused("Only the language team publishes a revision.", 403);
+  const [head, list] = await Promise.all([store.branchHead(MAIN), revisions(store)]);
+  if (!head) throw new Refused("The working text is empty.", 409);
+  if (list[0] && list[0].sha === head) return { unchanged: true, tag: list[0].name };
+  const tag = `register-${(list[0] ? list[0].n : 0) + 1}`;
+  try {
+    await store.createTag(tag, head);
+  } catch (e) {
+    if (e instanceof StaleError) throw new Refused(`Someone published ${tag} meanwhile: reload the page.`, 409);
+    throw e;
+  }
+  return { tag, sha: head };
 }
 
 // Chapters whose working text differs from the approved one.

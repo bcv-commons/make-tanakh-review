@@ -87,6 +87,22 @@ for (const [kind, fresh] of Object.entries(STORES)) {
     assert.deepEqual((await S.proposal(st(), await S.openPR(st(), "ann")))[0].verses, ["1:1"]);
   });
 
+  test(`${kind}: publish a revision: the team tags main register-<n>; again only after main moved`, async () => {
+    const { st } = await fresh();
+    await assert.rejects(S.publishRevision(st("ann"), "ann"), /team/);
+    assert.deepEqual(await S.revisions(st()), []);
+    assert.equal((await S.publishRevision(st("lead"), "lead")).tag, "register-1");
+    assert.deepEqual(await S.publishRevision(st("lead"), "lead"), { unchanged: true, tag: "register-1" });
+    await edit(st, "ann", 0, "Efter at Moses,");
+    await S.requestReviewer(st("rev"), "rev");
+    await S.mergePR(st("rev"), "rev", 1);
+    const r = await S.publishRevision(st("lead"), "lead");
+    assert.equal(r.tag, "register-2");
+    assert.equal(r.sha, await st().branchHead("main"));
+    assert.deepEqual((await S.revisions(st())).map((t) => t.name), ["register-2", "register-1"]);
+    await assert.rejects(async () => st().createTag("register-2", r.sha), /exists/);   // the local store throws at once
+  });
+
   test(`${kind}: a save writes only the files that changed, in one commit`, async () => {
     const { st } = await fresh();
     const changed = async () => st().changedFiles(await st().branchHead("main"), await st("ann").branchHead("edit/ann"));

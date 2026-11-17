@@ -5,7 +5,7 @@ import Base from "../../layouts/Base.astro";
 import Nav from "../../components/Nav.astro";
 import { storeFor, languageName, rememberLanguage } from "../../lib/config.js";
 import { currentUser } from "../../lib/session.js";
-import { proposal, awaitingApproval, roles, language } from "../../lib/service.js";
+import { proposal, awaitingApproval, roles, language, revisions } from "../../lib/service.js";
 import { byVerse, atoms } from "../../lib/units.js";
 const { lang } = Astro.params;
 const user = await currentUser(Astro.cookies);
@@ -13,7 +13,8 @@ const store = await storeFor(lang, user);
 Object.assign(Astro.locals, { store, storeLang: lang });                  // the menu (Nav) reads through it too
 if (!store) return new Response("No such language", { status: 404 });
 // the parts of the page side by side (on GitHub each read is a request)
-const [me, prs, waiting, langInfo] = await Promise.all([roles(store, user?.login), store.listPRs(), awaitingApproval(store), language(store)]);
+const [me, prs, waiting, langInfo, revs] = await Promise.all([roles(store, user?.login), store.listPRs(), awaitingApproval(store), language(store),
+  revisions(store)]);
 const open = await Promise.all(prs.filter((p) => p.status === "open" || p.status === "conflict").map(async (p) => ({ ...p, files: await proposal(store, p) })));
 const done = prs.filter((p) => p.status === "merged" || p.status === "closed").slice(-10).reverse();
 const label = (list) => { const a = atoms(list); return list.map((u, i) => ({ ...u, label: a[i] })); };
@@ -86,6 +87,16 @@ const name = languageName(lang);
       )}
     </section>
   ))}
+
+  <h2>Published for the drafting side</h2>
+  <p class="muted">The team marks the working text as a revision; the drafting side takes in its edits, choices and register from
+    there and drafts again.</p>
+  {revs.length === 0 ? <p class="muted">Nothing published yet.</p> :
+    <ul>{revs.slice(0, 5).map((t) => <li><code>{t.name}</code> at {t.sha.slice(0, 7)}</li>)}</ul>}
+  {me.team && (
+    <form method="post" action="/api/publish-revision" class="actions"><input type="hidden" name="lang" value={lang} />
+      <button class="primary">Publish the working text as a revision</button></form>
+  )}
 
   {done.length > 0 && (<>
     <h2>Recently settled</h2>

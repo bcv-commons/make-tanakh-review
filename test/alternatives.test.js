@@ -96,12 +96,22 @@ for (const [kind, make] of Object.entries(STORES)) {
     assert.deepEqual((await S.load(st(), null, "JOS/JOS_001.md")).alternatives, []);
     await st().writeFiles("main", { ".tanakh/alternatives/README.md": README, ...files(".tanakh/alternatives/nllb/JOS/JOS_001", altFiles()),
       ...files(".tanakh/alternatives/shape/JOS/JOS_002", altFiles("shape")) }, { message: "alternatives" });
-    const [a, ...rest] = (await S.load(st(), null, "JOS/JOS_001.md")).alternatives;
+    const held = await S.load(st(), null, "JOS/JOS_001.md");
+    assert.deepEqual([held.alternatives, held.altsHeld], [[], ["nllb"]]);       // no screen mark in .tanakh/runs/: not shown
+    const runs = (v) => ({ ".tanakh/runs/JOS_001.json": JSON.stringify({ book: "JOS", chapter: 1, main: "main", drafts: { main: { run: "r1" },
+      nllb: { run: "r2", screen: { verbatim: v, threshold: { run: 10, share: 0.8, min_run: 5, scope: "same verse" }, checked: "2026-11-17" } } } }) });
+    await st().writeFiles("main", runs("failed"), { message: "runs" });
+    assert.deepEqual((await S.load(st(), null, "JOS/JOS_001.md")).altsHeld, ["nllb"]);
+    await st().writeFiles("main", runs("passed"), { message: "runs" });
+    const d = await S.load(st(), null, "JOS/JOS_001.md");
+    assert.deepEqual(d.altsHeld, []);
+    const [a, ...rest] = d.alternatives;
     assert.equal(rest.length, 0);                                       // shape has no JOS 1
     assert.equal(a.kind, "nllb");
     assert.equal(a.built, "2026-11-08");
     assert.match(a.about, /NLLB-200/);
     assert.deepEqual(a.verses["1:1"].map((x) => [x.clause, x.text]), [[A, "Da Moses var død, talte"], [B, "HERREN til Josva og"]]);
     assert.deepEqual(a.verses["1:2"][0].words, ["min", "tjener", "moses", "døde"]);
+    assert.ok(S.screened({ drafts: { x: { screen: { verbatim: "not needed" } } } }, "x"));
   });
 }

@@ -244,6 +244,22 @@ export class GitHubStore {
     this.refs.set(`${w.repo}|${branch}`, to);
   }
 
+  // ---- tags (the revisions the drafting side takes in), on the language repo; written by the App
+
+  async listTags(prefix = "") {
+    const list = await this.get(`/repos/${this.base}/git/matching-refs/tags/${enc(prefix)}`);
+    return list.map((r) => ({ name: r.ref.replace(/^refs\/tags\//, ""), sha: r.object.sha }));
+  }
+
+  async createTag(name, sha) {
+    try {
+      await this.call("POST", `/repos/${this.base}/git/refs`, { token: await this.appToken(), body: { ref: `refs/tags/${name}`, sha } });
+    } catch (e) {
+      if (e instanceof GitHubError && e.status === 422) throw new StaleError(`the tag ${name} exists already`);
+      throw e;
+    }
+  }
+
   // ---- pull requests (GitHub's; records shaped as LocalGitStore's)
 
   record(p) {

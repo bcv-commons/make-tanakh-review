@@ -21,7 +21,10 @@ start({ lang: "dan", file: "JOS/JOS_001.md", book: "JOS", chapter: 1, user: { lo
   units, version: {}, main: units, approved: units, hebrew,
   verses: { "1:1": { profile: "b", stale: false }, "1:2": { profile: "s", stale: false }, "1:3": { profile: "h", stale: false } },
   title: "Josvabogen, kapitel 1", headings: { "1:1": ["Josva bliver leder"] }, notes: { "1:2": [{ kind: "T", anchor: 4, text: "Ordret: tjener." }] },
-  poetry: { "1:1": [{ at: 0, level: 1 }, { at: 5, level: 2 }] } });
+  poetry: { "1:1": [{ at: 0, level: 1 }, { at: 5, level: 2 }] },
+  parts: { "1:3": { text: "Hvert sted.", words: [{ start: 0, end: 5, pieces: [{ text: "Hv", slot: "stem", morph: null }, { tone: "" },
+    { text: "ert", slot: "s1", morph: "m:-ert" }] }, { start: 6, end: 10, pieces: [{ text: "sted", slot: "whole", morph: null }] }] },
+    "1:2": { text: "Min tjener er død!", words: [{ start: 0, end: 3, pieces: [{ text: "Min", slot: "whole", morph: null }] }] } } });
 
 const boxes = () => [...document.querySelectorAll("textarea.u")];
 
@@ -36,10 +39,23 @@ test("title, heading before its verse, notes under their verse, Hebrew clause fo
   assert.equal(document.querySelector("#v2 .poem"), null);
 });
 
-test("statuses from the profile letters: s = check, h = checked, b = nothing to say", () => {
-  assert.match(document.querySelector("#v2 .vstat.check").textContent, /check links/);
+test("statuses from the profile letters: s = a quiet 'links moved', h = checked, b = nothing to say", () => {
+  assert.match(document.querySelector("#v2 .vstat.moved").textContent, /links moved/);
   assert.match(document.querySelector("#v3 .vstat.ok").textContent, /links checked/);
   assert.equal(document.querySelector("#v1 .vstat"), null);
+});
+
+test("word parts: faint under the clause, known forms marked, only while the verse is the text they were made from", () => {
+  const p = document.querySelector("#v3 .parts");
+  assert.equal(p.textContent, "Hv·ertsted");
+  assert.deepEqual([...p.querySelectorAll(".pc.known")].map((x) => x.textContent), ["ert"]);
+  assert.match(p.querySelector(".pw").title, /ert: s1 \(m:-ert\)/);
+  assert.equal(document.querySelector("#v2 .parts"), null);                 // made from another text of the verse
+  const box = document.querySelector("#bar input[type=checkbox]");
+  box.checked = false; box.dispatchEvent(new window.Event("change"));
+  assert.equal(document.querySelector("#v3 .parts"), null);
+  box.checked = true; box.dispatchEvent(new window.Event("change"));
+  assert.ok(document.querySelector("#v3 .parts"));
 });
 
 test("a verse whose text is edited: links re-projected on save, then shown as to check", async () => {
@@ -49,7 +65,7 @@ test("a verse whose text is edited: links re-projected on save, then shown as to
   boxes()[1].dispatchEvent(new window.Event("input"));   // any re-render keeps the state
   document.querySelector("#bar button.primary").click();
   await new Promise((r) => setTimeout(r, 10));
-  assert.match(document.querySelector("#v1 .vstat.check").textContent, /check links/);
+  assert.match(document.querySelector("#v1 .vstat.moved").textContent, /links moved/);
   assert.match(document.querySelector("#bar").textContent, /proposal #3/);
   assert.equal(document.querySelector("#v1 .poem"), null);                  // placed on the old text: not shown
 });

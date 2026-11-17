@@ -431,6 +431,14 @@ In detail (2026-11-03, as the code expects it):
   a repo), the register editor, questionnaire and inbox (4), word parts shown faintly (6), a "publish revision" tag (7). Not
   needed: a splitter here (8; `.parts` is rebuilt at the drafting side's intake). New: "the source is wrong here", a row keyed
   by the word or clause key for bcv-commons; a lexeme with no candidate is a typed word (NEW).
+  Research's answer the same day (make-tanakh-research; the publishers write the files, research gives the rules and figures):
+  the formats agreed with changes, now FORMAT.md sections 13-16 (the screen mark with its threshold as an object and "not
+  needed"; `.choices` options are words, `concept` beside `sense`, the publisher's order, a single non-free count left out;
+  `.flags` `measured` per language and kind of draft; the shape trace a sidecar, ids only). **Built:** word parts faint under
+  each clause (`src/lib/parts.js`; fresh rows only, known forms bold, a "word parts" switch; zin RUT 1: 22 of 22 verses);
+  "publish the working text as a revision" for the team on the review page (`register-<n>` on main; store `listTags`,
+  `createTag`); alternatives shown only with the screen mark (zin's and kvg's nllb/rules/shape are held back until their
+  `.tanakh/runs/` carry it; the bar says so); "check links" became a quiet "links moved". Next: `.flags`, then `.choices`.
 
 ## 13. Moving to its own repo (planned 2026-10-31, not done)
 

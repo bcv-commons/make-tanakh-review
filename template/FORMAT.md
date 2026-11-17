@@ -274,4 +274,70 @@ Written by the publisher beside a chapter (and beside an alternative), never edi
   all pieces `/n` share it), and the columns to match on.
 - `.tanakh/publisher.json`: `{ login, name, url }`. These, the alternatives and `.parts` are derived: a pull request by anyone
   but the publisher's `login` that touches them gets a notice.
+- **The screen mark** (agreed with make-tanakh-research 2026-11-17): each draft in `.tanakh/runs/` carries
+  `"screen": {"verbatim": "passed" | "not needed", "threshold": {"run": 10, "share": 0.8, "min_run": 5, "scope": "same verse"},
+  "against": "the team's text", "checked": "YYYY-MM-DD"}`. The rule (the user's, 2026-11-04): a draft unit fails when it repeats
+  the team's text of the same verse for `run` or more consecutive words, or, in a unit of more than `run` words, when `share`
+  of its words sit inside runs of `min_run` or more (exact words: lower-cased, NFC, split at spaces and hyphens, punctuation
+  stripped, tone and length marks kept; phrases shared with other verses never count). `not needed`: no non-free input. The
+  editor shows an alternative only when its draft's mark is `passed` or `not needed`.
+- **Revisions** for the drafting side: the team's "publish" in the editor tags main's head `register-<n>` (lightweight, by the
+  App, n counting up); the drafting side takes in a language's edits, choices and register from the newest tag.
+
+## 14. Word choices (`<BOOK>_<CCC>.choices`, make-tanakh-choices/1; agreed with make-tanakh-research 2026-11-17)
+
+Written by the publisher beside a chapter, never edited; the editor's word picker reads it. Per content word that has a list,
+the team's likely words for it, ranked by the publisher (the editor never re-sorts):
+
+```json
+{
+  "format": "make-tanakh-choices/1",
+  "sources": { "nt": "the team's NT (counts)", "heb-nt": "Hebrew NT pairs", "drafts": "our drafts", "team": "the register" },
+  "verses": {
+    "1:2": { "hash": "6ec2d3f5",
+             "words": { "o060010020031": { "lexeme": "hbo:5650", "sense": "", "concept": "",
+                                           "draft": 0, "llm": 0,
+                                           "options": [["mtumishi", { "nt": 41, "heb-nt": 3 }], ["mtumwa", { "nt": 12 }]] } } }
+  }
+}
+```
+
+- `hash`: the verse hash of section 12; a verse whose hash no longer matches is stale (the picker is not offered there).
+- Word ids: MACULA Hebrew's `xml:id` (Tanakh), MACULA Greek's (NT, lexemes `grc:G…`). `sense` and `concept` (the code of
+  hebrew-word-concepts-model, e.g. `H430.2`, finer than the sense) may be empty.
+- `options`: 1 to 8, best first. Each is a **word**, written in its commonest form so the reviewer recognises it: not "use this
+  exact form here" (the re-draft fits the form). Evidence: counts per source only, never examples or references. An option
+  seen once in a non-free NT and in no other source is left out (a single count points at one place).
+- `draft` / `llm`: the index of the option the draft wrote, and the one the LLM drafter picked, or null.
+- A word the reviewer types is an ordinary edit row (section 10). A choice wider than "only here" is a register entry in the
+  same proposal: `.tanakh/register/lexicon/<slug>-<6 hex of sha256(id)>.json`
+  `{"format": "make-tanakh-register/1", "kind": "lexicon", "lexeme", "sense", "concept", "form", "scope": "all" | "book:<BOOK>",
+  "from": {"ref", "word"}, "by", "date"}` (with `concept`, a re-draft applies it to that concept only). Other chapters are never
+  rewritten from the editor: the re-draft applies the entry, and the editor marks "team chose" on the word elsewhere.
+
+## 15. Review flags (`<BOOK>_<CCC>.flags`, make-tanakh-flags/1; agreed with make-tanakh-research 2026-11-17)
+
+Written by the publisher beside a chapter, never edited:
+
+```json
+{
+  "format": "make-tanakh-flags/1", "draft": "main", "made": "YYYY-MM-DD",
+  "kinds": { "soft": { "label": "the two alignments differ", "precision": 0.59,
+                       "measured": { "language": "zin", "draft": "llm-free", "n": 412, "date": "YYYY-MM-DD", "where": "John 1-4 dev" } } },
+  "verses": { "1:9": { "hash": "…", "flags": [{ "unit": "<.units key>", "kind": "soft", "word": "<word id, optional>", "p": 0.59,
+                                               "note": "<short, optional>" }] } }
+}
+```
+
+- The editor shows a flag as "<label> (<p>)", `p` from the flag else the kind's precision, and hides any under 0.5. A kind's
+  precision is shown only where `measured.draft` is the kind of draft the chapter's main draft is (`.tanakh/runs/`); elsewhere
+  no number. A verse whose hash no longer matches shows no flags.
+- Kinds ship only measured at 0.5 or more for that language and kind of draft (2026-11-17: `firm` / `soft`, 0.68 / 0.59;
+  `nt-unused` and the rule checks not yet measured).
+
+## 16. The shape draft's trace (`.tanakh/alternatives/shape/<BOOK>/<BOOK>_<CCC>.trace`, make-tanakh-trace/1; proposed)
+
+Where each word of the `shape` alternative came from: JSON with a verse `hash` and per token `{"i": j, "from": "ref" | "lex" |
+"lex+affix" | "base", "clause": "<clause key>", "word": n}`, ids only, never text. For a team whose NT is not free the trace keeps
+`from` and drops `clause` and `word`. The editor shows it on hover over the alternative's words.
 

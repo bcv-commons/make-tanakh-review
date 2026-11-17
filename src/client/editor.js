@@ -4,8 +4,9 @@ import { poemLines } from "../lib/poetry.js";
 import { forUnit, agreement, shade } from "../lib/alternatives.js";
 
 // The status of a verse's alignment, from its .align profile letter (template/FORMAT.md section 2)
+// Re-projected links are right about a quarter of the time they are doubted (research, 2026-11-16): a quiet note, not a warning.
 const PROFILE = { a: ["aligned by script", ""], b: ["aligned by an agent", ""], h: ["links checked by a person", "ok"],
-  j: ["links judged by Jev", "ok"], s: ["links re-projected after an edit: check", "check"] };
+  j: ["links judged by Jev", "ok"], s: ["the links were carried over to an edited wording; nobody has looked at them since", "moved"] };
 
 let S;            // state: the page data + units, dirty, gloss mode
 const $ = (sel) => document.querySelector(sel);
@@ -27,8 +28,9 @@ const sig = (u) => JSON.stringify([u.bases, u.text.trim()]);
 export function start(data) {
   const g = localGet("mtr-glosses", "da");
   const a = localGet("mtr-alts", "all");
+  const p = localGet("mtr-parts", "on");
   S = { ...data, glossTable: data.glosses, dirty: false, glosses: g === "en" || g === "0" ? g : "da", msg: "", err: false,
-    alts: ["all", "shade", "off"].includes(a) ? a : "all", undo: null, uses: [], statusEdits: {} };
+    alts: ["all", "shade", "off"].includes(a) ? a : "all", showParts: p !== "off", undo: null, uses: [], statusEdits: {} };
   S.mainSigs = new Map([...byVerse(S.main)].map(([r, l]) => [r, new Set(l.map(sig))]));
   S.mainVerse = new Map([...byVerse(S.main)].map(([r, l]) => [r, JSON.stringify(l.map(sig))]));
   S.savedText = verseTexts(S.units);
@@ -71,6 +73,15 @@ function renderBar() {
       "other drafts ", el("select", { onchange: (e) => { S.alts = e.target.value; localSet("mtr-alts", S.alts); render(); } },
         o("all", "shown, with shading"), o("shade", "shading only"), o("off", "off"))));
   }
+  if (Object.keys(S.parts || {}).length) {
+    bar.append(el("label", { class: "toggle", title: "Each word's parts (from the drafting side's word splitter), faint under the clause; "
+      + "parts in bold are known forms of the language's register. Only whole words are edited." },
+      el("input", { type: "checkbox", checked: S.showParts, onchange: (e) => { S.showParts = e.target.checked; localSet("mtr-parts", S.showParts ? "on" : "off"); render(); } }),
+      " word parts"));
+  }
+  if ((S.altsHeld || []).length) bar.append(el("span", { class: "muted", title: "The drafting side has not yet marked these drafts as "
+    + "checked against copying the team's text (FORMAT.md section 13), so they are not shown" },
+    `${S.altsHeld.length} other draft${S.altsHeld.length === 1 ? "" : "s"} held back (${S.altsHeld.join(", ")})`));
   if (S.undo) bar.append(el("button", { onclick: undoUse, title: "Put back the clause's text from before" }, `Undo “use ${S.undo.kind}”`));
   if (S.msg) bar.append(el("span", { class: S.err ? "err" : "note" }, S.msg));
 }
@@ -125,9 +136,9 @@ function hebrewCell(verse, u, seen) {
 // will be re-projected when it is saved.
 function verseHead(ref, changedHere) {
   const v = ref.split(":")[1], info = (S.verses || {})[ref] || {};
-  const [label, cls] = info.stale ? ["the alignment does not match the text: check", "check"] : PROFILE[info.profile] || [null, ""];
-  const tag = changedHere ? el("div", { class: "vstat", title: "The links of this verse are re-projected onto the new text when you save" }, "links re-projected on save")
-    : label ? el("div", { class: `vstat${cls ? ` ${cls}` : ""}`, title: label }, cls === "check" ? "check links" : cls === "ok" ? "links checked" : "") : null;
+  const [label, cls] = info.stale ? ["the alignment was made for another wording of this verse", "moved"] : PROFILE[info.profile] || [null, ""];
+  const tag = changedHere ? el("div", { class: "vstat", title: "The links of this verse are carried over to the new wording when you save" }, "links carried over on save")
+    : label ? el("div", { class: `vstat${cls ? ` ${cls}` : ""}`, title: label }, cls === "moved" ? "links moved" : cls === "ok" ? "links checked" : "") : null;
   return el("div", { class: "vnum" }, v, tag && tag.textContent ? tag : null);
 }
 
@@ -148,18 +159,34 @@ function poemOf(ref, text) {
     poemLines(text, br).map((l) => el("div", { class: `pl l${Math.min(l.level, 3)}` }, l.text)));
 }
 
+// Under a clause: its words' parts (FORMAT.md section 12), faint, pieces joined by a dot; a piece with a morph id (a known form,
+// a register entry) stronger. Only for a verse whose text is still the one the parts were made from. at: the unit's [start, end)
+// in the verse text (the units joined with a space).
+function partsOf(ref, at, verseText) {
+  const vp = (S.parts || {})[ref];
+  if (!S.showParts || !vp || vp.text !== verseText) return null;
+  const words = vp.words.filter((w) => w.start >= at[0] && w.end <= at[1]);
+  if (!words.length) return null;
+  const about = (w) => w.pieces.map((p) => ("tone" in p ? `tone${p.tone ? ` (${p.tone})` : ""}` : `${p.text}: ${p.slot}${p.morph ? ` (${p.morph})` : ""}`)).join(" · ");
+  return el("div", { class: "parts", "aria-label": "word parts" }, words.map((w) => el("span", { class: "pw", title: about(w) },
+    w.pieces.filter((p) => !("tone" in p)).map((p, k) => [k ? el("span", { class: "dot" }, "·") : null,
+      el("span", { class: p.morph ? "pc known" : "pc" }, p.text)]).flat())));
+}
+
 function render(focus = null, caret = null) {
   renderBar();
   const root = $("#editor");
   root.replaceChildren();
   const labels = atoms(S.units);
+  const texts = verseTexts(S.units);
+  let at = 0;                                    // the unit's offset in its verse text
   root.append(statusBlock());
   if (S.title) root.append(el("h2", { class: "ctitle" }, S.title));
   let verse = null, block = null, seen = null;
   const blocks = [];
   S.units.forEach((u, i) => {
     if (u.ref !== verse) {
-      verse = u.ref; seen = new Set();
+      verse = u.ref; seen = new Set(); at = 0;
       const v = verse.split(":")[1];
       const mine = S.units.filter((x) => x.ref === verse);
       const textChanged = mine.map((x) => x.text.trim()).join(" ") !== (S.savedText || {})[verse];
@@ -184,12 +211,14 @@ function render(focus = null, caret = null) {
         const at = u.text.length + 1; const r = join(S.units, i); apply(r, r.focus, at);
       } }, "⤓")) : null;
     const heb = hebrewCell(verse.split(":")[1], u, seen);
+    const span = [at, at + u.text.trim().length];
+    at = span[1] + 1;
     block.append(el("div", { class: `row${changed ? " changed" : ""}` }, heb,
       el("div", { class: "tgt" }, el("span", { class: "lab", title: "Hebrew clause(s) this unit renders" }, labels[i]),
         el("div", { class: "boxwrap" }, paint(el("div", { class: "mirror", "data-i": i, "aria-hidden": "true" }), u), ta), tools,
+        partsOf(verse, span, texts[verse]),
         S.alts === "all" ? altsOf(i, u) : null)));
   });
-  const texts = verseTexts(S.units);
   for (const [ref, b] of blocks) { const p = poemOf(ref, texts[ref]); if (p) b.append(p); const n = notesOf(ref); if (n) b.append(n); }
   root.querySelectorAll("textarea.u").forEach(autosize);
   if (focus != null) {

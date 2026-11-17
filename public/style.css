@@ -87,7 +87,7 @@ mark.check, .mirror mark.check { background: var(--check-bg); outline: 1px dashe
 @media (prefers-color-scheme: dark) { :root { --firm: #24452f; --check: #e0a84a; --check-bg: #3b3020; } }
 /* the chapter format (template/FORMAT.md): alignment status per verse, title, headings, notes */
 .vstat { font-size: 10px; font-weight: 400; color: var(--muted); line-height: 1.2; margin-top: 4px; }
-.vstat.check { color: var(--check); } .vstat.ok { color: var(--ok); }
+.vstat.check { color: var(--check); } .vstat.ok { color: var(--ok); } .vstat.moved { color: var(--muted); font-style: italic; }
 .ctitle { margin: 12px 0 4px; } .heading { margin: 16px 0 4px; font-size: 17px; }
 .notes { grid-column: 2; margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
 .poem { grid-column: 2; margin: 6px 0 0; padding: 4px 10px; border-left: 2px solid var(--line, #ccc); font-size: 14px; line-height: 1.45; }
@@ -110,3 +110,5 @@ details.status summary { cursor: pointer; }
 .sgrid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; align-items: center; margin: 6px 0; max-width: 640px; }
 .sgrid input { width: 100%; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
 .sgrid input[readonly] { border-color: transparent; background: transparent; }
+.parts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 2px 0 0; font-size: 12px; line-height: 1.3; color: var(--muted); opacity: .8; }
+.parts .dot { opacity: .6; padding: 0 1px; } .parts .known { color: var(--fg); font-weight: 600; }

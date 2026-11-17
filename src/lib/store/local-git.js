@@ -108,6 +108,21 @@ export class LocalGitStore {
     this.git(["update-ref", `refs/heads/${branch}`, to]);
   }
 
+  // ---- tags (the revisions the drafting side takes in): [{ name, sha }] of the lightweight tags starting with `prefix`
+  listTags(prefix = "") {
+    const out = this.tryGit(["for-each-ref", "--format=%(refname:strip=2) %(objectname)", `refs/tags/${prefix}*`]);
+    return out ? out.split("\n").map((l) => { const [name, sha] = l.split(" "); return { name, sha }; }) : [];
+  }
+
+  // a new tag at a commit; refused (StaleError) when the name is taken
+  createTag(name, sha) {
+    try {
+      this.git(["update-ref", `refs/tags/${name}`, sha, "0000000000000000000000000000000000000000"]);
+    } catch {
+      throw new StaleError(`the tag ${name} exists already`);
+    }
+  }
+
   // ---- pull requests and other state (on GitHub: the Pulls API, collaborators, CODEOWNERS)
 
   state() {

@@ -103,6 +103,19 @@ export function mockGitHub({ org = "global-tanakh", repo = "dan", publicKey = nu
       return sha ? [200, { ref: `refs/heads/${m[1]}`, object: { sha, type: "commit" } }] : [404, { message: "Not Found" }];
     }
     if (write && rest.startsWith("/git/") && !canPush(actor, name)) return [403, { message: "Resource not accessible by integration" }];
+    if ((m = /^\/git\/matching-refs\/tags\/(.*)$/.exec(rest)) && method === "GET") {
+      const prefix = decodeURIComponent(m[1]);
+      return [200, [...(r.tags || new Map())].filter(([t]) => t.startsWith(prefix)).sort()
+        .map(([t, sha]) => ({ ref: `refs/tags/${t}`, object: { sha, type: "commit" } }))];
+    }
+    if (rest === "/git/refs" && method === "POST" && body.ref.startsWith("refs/tags/")) {
+      const t = body.ref.slice(10);
+      r.tags ||= new Map();
+      if (r.tags.has(t)) return [422, { message: "Reference already exists" }];
+      if (objects.get(body.sha)?.type !== "commit") return [422, { message: "Object does not exist" }];
+      r.tags.set(t, body.sha);
+      return [201, { ref: body.ref, object: { sha: body.sha } }];
+    }
     if (rest === "/git/refs" && method === "POST") {
       const branch = body.ref.replace(/^refs\/heads\//, "");
       if (r.refs.has(branch)) return [422, { message: "Reference already exists" }];
